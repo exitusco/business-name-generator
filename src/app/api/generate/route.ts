@@ -30,6 +30,9 @@ NAMING PREFERENCES:
 - Preferred styles: ${stylesList}
 - Phonetically transparent (easy to spell from hearing): ${config.phoneticTransparency || 'no preference'}
 - Domain modifiers acceptable (like join___, use___, get___): ${config.domainModifiers || 'no preference'}
+- Prioritize names likely to have .com domain available: ${config.prioritizeAvailability || 'no preference'}
+
+${config.prioritizeAvailability === 'yes' ? `IMPORTANT: Strongly prioritize names that are UNLIKELY to already be registered as .com domains. Favor invented/coined words, unusual letter combinations, creative portmanteaus, and unique compound words. Avoid common dictionary words, popular phrases, or obvious business terms that are almost certainly already taken. The names should still sound professional and relevant, but lean toward the creative and distinctive end of the spectrum.` : ''}
 
 ${existingNames.length > 0 ? `ALREADY SUGGESTED (do NOT repeat any of these): ${existingNames.join(', ')}` : ''}
 

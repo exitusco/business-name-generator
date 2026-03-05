@@ -13,6 +13,7 @@ export default function ConfigurePage() {
   const [domainModifiers, setDomainModifiers] = useState('');
   const [competitorNames, setCompetitorNames] = useState('');
   const [otherDetails, setOtherDetails] = useState('');
+  const [prioritizeAvailability, setPrioritizeAvailability] = useState('');
 
   useEffect(() => {
     // Load any existing config
@@ -27,6 +28,7 @@ export default function ConfigurePage() {
           setDomainModifiers(c.domainModifiers || '');
           setCompetitorNames(c.competitorNames || '');
           setOtherDetails(c.otherDetails || '');
+          setPrioritizeAvailability(c.prioritizeAvailability || '');
         } catch {}
       }
     }
@@ -48,6 +50,7 @@ export default function ConfigurePage() {
       domainModifiers,
       competitorNames,
       otherDetails,
+      prioritizeAvailability,
     };
     if (typeof window !== 'undefined') {
       localStorage.setItem('nc_config', JSON.stringify(config));
@@ -146,6 +149,31 @@ export default function ConfigurePage() {
                   onClick={() => setDomainModifiers(opt.toLowerCase())}
                   className={`px-4 py-2 rounded-lg text-sm transition-all border ${
                     domainModifiers === opt.toLowerCase()
+                      ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
+                      : 'bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-dim)]'
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Prioritize available domains */}
+          <div>
+            <label className="block text-sm font-medium mb-3 text-[var(--text-secondary)]">
+              Prioritize names likely to have .com available?
+            </label>
+            <p className="text-xs text-[var(--text-secondary)]/60 mb-3">
+              The AI will favor more unique, invented, or uncommon names that are less likely to already be registered.
+            </p>
+            <div className="flex gap-3">
+              {['Yes', 'No', 'No preference'].map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setPrioritizeAvailability(opt.toLowerCase())}
+                  className={`px-4 py-2 rounded-lg text-sm transition-all border ${
+                    prioritizeAvailability === opt.toLowerCase()
                       ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
                       : 'bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-dim)]'
                   }`}

@@ -26,6 +26,7 @@ export interface UserConfig {
   domainModifiers: string;
   competitorNames: string;
   otherDetails: string;
+  prioritizeAvailability: string;
 }
 
 export interface SavedName {
