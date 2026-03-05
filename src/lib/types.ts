@@ -64,25 +64,41 @@ export const CARD_FONTS = [
   "'Outfit', sans-serif",
 ];
 
+// Curated gradients — all dark-to-mid-tone, cohesive aesthetic
+// Each uses a rich two-stop or three-stop gradient anchored in deep darks
+// with a single accent color direction for visual interest
 export const GRADIENTS = [
-  'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-  'linear-gradient(135deg, #2d1b69 0%, #11998e 100%)',
-  'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-  'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
-  'linear-gradient(135deg, #141e30 0%, #243b55 100%)',
-  'linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)',
-  'linear-gradient(135deg, #0b486b 0%, #f56217 100%)',
-  'linear-gradient(135deg, #232526 0%, #414345 100%)',
-  'linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)',
-  'linear-gradient(135deg, #1a2a6c 0%, #b21f1f 50%, #fdbb2d 100%)',
-  'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
-  'linear-gradient(135deg, #3a1c71 0%, #d76d77 50%, #ffaf7b 100%)',
-  'linear-gradient(135deg, #200122 0%, #6f0000 100%)',
-  'linear-gradient(135deg, #134e5e 0%, #71b280 100%)',
-  'linear-gradient(135deg, #373b44 0%, #4286f4 100%)',
-  'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
-  'linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%)',
-  'linear-gradient(135deg, #0d0d0d 0%, #434343 100%)',
-  'linear-gradient(135deg, #093028 0%, #237a57 100%)',
-  'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)',
+  // Deep blue family
+  'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0c4a6e 100%)',
+  'linear-gradient(135deg, #0b1120 0%, #1a365d 100%)',
+  'linear-gradient(150deg, #0f172a 0%, #1e40af 100%)',
+
+  // Teal / ocean
+  'linear-gradient(135deg, #0a1628 0%, #134e5e 50%, #1a6b5a 100%)',
+  'linear-gradient(140deg, #0d1b2a 0%, #1b4d5c 100%)',
+
+  // Purple / violet
+  'linear-gradient(135deg, #0f0a1e 0%, #2d1b69 50%, #4c1d95 100%)',
+  'linear-gradient(150deg, #13091f 0%, #3b0764 100%)',
+  'linear-gradient(135deg, #1a0533 0%, #4338ca 100%)',
+
+  // Warm dark — ember / wine
+  'linear-gradient(135deg, #1a0a0a 0%, #6b1a1a 50%, #8b2500 100%)',
+  'linear-gradient(140deg, #1c0f0f 0%, #7f1d1d 100%)',
+  'linear-gradient(135deg, #1a0a14 0%, #831843 100%)',
+
+  // Forest / emerald
+  'linear-gradient(135deg, #0a1a0f 0%, #14532d 50%, #166534 100%)',
+  'linear-gradient(140deg, #0b1a12 0%, #065f46 100%)',
+
+  // Slate / graphite with subtle color
+  'linear-gradient(135deg, #0f1419 0%, #1e293b 50%, #334155 100%)',
+  'linear-gradient(150deg, #111318 0%, #27303f 50%, #3e4c5e 100%)',
+
+  // Mixed accent — deep base with warm pop
+  'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #9f5820 100%)',
+  'linear-gradient(135deg, #13091f 0%, #312e81 50%, #7c3aed 100%)',
+  'linear-gradient(135deg, #0a1628 0%, #1e3a5f 50%, #0d9488 100%)',
+  'linear-gradient(135deg, #1a0a14 0%, #4c1d6e 50%, #be185d 100%)',
+  'linear-gradient(140deg, #0f172a 0%, #1e3050 50%, #c2410c 100%)',
 ];

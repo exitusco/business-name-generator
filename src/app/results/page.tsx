@@ -3,11 +3,33 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import { NameCard, SavedName, CARD_FONTS, GRADIENTS } from '@/lib/types';
+import { NameCard, DomainCheck, SavedName, CARD_FONTS, GRADIENTS } from '@/lib/types';
 import { pickTextColor } from '@/lib/colors';
 
-function generateCardStyle(): { gradient: string; fontFamily: string; textColor: string } {
-  const gradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
+// 'whoisxml' = accurate paid check, 'dns' = free fast estimate, 'pending' = not checked yet
+type CheckMethod = 'whoisxml' | 'dns' | 'pending';
+
+interface DomainCheckExt extends DomainCheck {
+  method: CheckMethod;
+}
+
+interface NameCardExt extends Omit<NameCard, 'exactDomain' | 'variantDomains'> {
+  exactDomain: DomainCheckExt;
+  variantDomains: DomainCheckExt[];
+  verified: boolean;
+  verifying: boolean;
+}
+
+function generateCardStyle(usedIndices: Set<number>): { gradient: string; fontFamily: string; textColor: string } {
+  let idx = Math.floor(Math.random() * GRADIENTS.length);
+  let attempts = 0;
+  while (usedIndices.has(idx) && attempts < 10) {
+    idx = Math.floor(Math.random() * GRADIENTS.length);
+    attempts++;
+  }
+  usedIndices.add(idx);
+  if (usedIndices.size > GRADIENTS.length - 3) usedIndices.clear();
+  const gradient = GRADIENTS[idx];
   const fontFamily = CARD_FONTS[Math.floor(Math.random() * CARD_FONTS.length)];
   const textColor = pickTextColor(gradient);
   return { gradient, fontFamily, textColor };
@@ -18,17 +40,19 @@ function porkbunSearchUrl(domain: string): string {
   return `https://porkbun.com/checkout/search?q=${encodeURIComponent(full)}`;
 }
 
-// Domain row inside card
 function DomainRow({
   domain,
   available,
+  method,
   isExact,
 }: {
   domain: string;
   available: boolean | null;
+  method: CheckMethod;
   isExact: boolean;
 }) {
   const fullDomain = domain.includes('.') ? domain : `${domain}.com`;
+  const isDns = method === 'dns';
 
   if (available === null) {
     return (
@@ -54,28 +78,31 @@ function DomainRow({
           : 'bg-white/[0.02] hover:bg-white/[0.05]'
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         {available ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6L9 17l-5-5"/>
           </svg>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
+          <svg className="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
         )}
-        <span className={`text-xs font-mono ${available ? 'text-[#4ade80]' : 'text-white/35'}`}>
+        <span className={`text-xs font-mono truncate ${available ? 'text-[#4ade80]' : 'text-white/35'}`}>
           {fullDomain}
         </span>
         {isExact && (
-          <span className={`text-[10px] uppercase tracking-wider ${available ? 'text-[#4ade80]/60' : 'text-white/15'}`}>
+          <span className={`shrink-0 text-[10px] uppercase tracking-wider ${available ? 'text-[#4ade80]/60' : 'text-white/15'}`}>
             exact
           </span>
         )}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        {isDns && available && (
+          <span className="text-[10px] text-white/20" title="Checked via DNS — use Verify for accurate result">~</span>
+        )}
         <span className={`text-[10px] font-medium uppercase tracking-wider ${available ? 'text-[#4ade80]/80' : 'text-white/20'}`}>
-          {available ? 'Available' : 'Taken'}
+          {available ? (isDns ? 'Likely free' : 'Available') : 'Taken'}
         </span>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={available ? 'text-[#4ade80]/50' : 'text-white/15'}>
           <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/>
@@ -85,13 +112,13 @@ function DomainRow({
   );
 }
 
-// Status banner at top of domain section
-function StatusBanner({ card }: { card: NameCard }) {
+function StatusBanner({ card }: { card: NameCardExt }) {
   const exactAvailable = card.exactDomain.available;
   const anyVariantAvailable = card.variantDomains.some(v => v.available === true);
   const allChecked = card.exactDomain.available !== null && card.variantDomains.every(v => v.available !== null);
   const stillLoading = !allChecked;
   const availableCount = [card.exactDomain, ...card.variantDomains].filter(d => d.available === true).length;
+  const hasUnverifiedAvailable = card.variantDomains.some(v => v.available === true && v.method === 'dns');
 
   if (stillLoading) {
     return (
@@ -123,7 +150,7 @@ function StatusBanner({ card }: { card: NameCard }) {
           <circle cx="12" cy="12" r="10"/>
         </svg>
         <span className="text-[10px] text-[#fbbf24] uppercase tracking-wider font-semibold">
-          .com taken · {availableCount} variant{availableCount > 1 ? 's' : ''} available
+          .com taken · {availableCount} variant{availableCount > 1 ? 's' : ''} {hasUnverifiedAvailable && !card.verified ? 'likely free' : 'available'}
         </span>
       </div>
     );
@@ -145,17 +172,21 @@ function NameCardComponent({
   card,
   index,
   onSave,
+  onVerify,
   isSaved,
 }: {
-  card: NameCard;
+  card: NameCardExt;
   index: number;
-  onSave: (card: NameCard) => void;
+  onSave: (card: NameCardExt) => void;
+  onVerify: (cardId: string) => void;
   isSaved: boolean;
 }) {
   const exactAvailable = card.exactDomain.available;
   const anyVariantAvailable = card.variantDomains.some(v => v.available === true);
   const allChecked = card.exactDomain.available !== null && card.variantDomains.every(v => v.available !== null);
   const noneAvailable = allChecked && !exactAvailable && !anyVariantAvailable;
+  const hasUnverifiedAvailable = card.variantDomains.some(v => v.available === true && v.method === 'dns');
+  const showVerify = allChecked && hasUnverifiedAvailable && !card.verified;
 
   let borderColor = 'rgba(42, 42, 58, 1)';
   let shadowColor = 'transparent';
@@ -163,8 +194,8 @@ function NameCardComponent({
     borderColor = 'rgba(74, 222, 128, 0.5)';
     shadowColor = 'rgba(74, 222, 128, 0.08)';
   } else if (anyVariantAvailable) {
-    borderColor = 'rgba(251, 191, 36, 0.4)';
-    shadowColor = 'rgba(251, 191, 36, 0.06)';
+    borderColor = card.verified ? 'rgba(251, 191, 36, 0.4)' : 'rgba(251, 191, 36, 0.25)';
+    shadowColor = 'rgba(251, 191, 36, 0.04)';
   } else if (noneAvailable) {
     borderColor = 'rgba(248, 113, 113, 0.25)';
   }
@@ -178,7 +209,6 @@ function NameCardComponent({
         boxShadow: shadowColor !== 'transparent' ? `0 0 24px ${shadowColor}` : undefined,
       }}
     >
-      {/* Card visual area */}
       <div
         className="h-40 sm:h-48 flex items-center justify-center p-6 relative"
         style={{ background: card.gradient }}
@@ -194,7 +224,6 @@ function NameCardComponent({
           {card.name}
         </h2>
 
-        {/* Save button */}
         <button
           onClick={() => onSave(card)}
           className={`absolute top-3 right-3 p-2 rounded-lg transition-all ${
@@ -205,28 +234,22 @@ function NameCardComponent({
           title={isSaved ? 'Saved!' : 'Save this name'}
         >
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
+            width="16" height="16" viewBox="0 0 24 24"
             fill={isSaved ? 'currentColor' : 'none'}
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
           >
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
           </svg>
         </button>
       </div>
 
-      {/* Status banner */}
       <StatusBanner card={card} />
 
-      {/* Domain list — shows ALL checked domains */}
       <div className="bg-[var(--bg-secondary)] px-2.5 py-2 flex flex-col gap-1">
         <DomainRow
           domain={card.exactDomain.domain}
           available={card.exactDomain.available}
+          method={card.exactDomain.method}
           isExact={true}
         />
         {card.variantDomains.map((v) => (
@@ -234,17 +257,59 @@ function NameCardComponent({
             key={v.domain}
             domain={v.domain}
             available={v.available}
+            method={v.method}
             isExact={false}
           />
         ))}
       </div>
+
+      {/* Verify button — only shown when there are unverified DNS results that look available */}
+      {showVerify && (
+        <div className="bg-[var(--bg-secondary)] px-2.5 pb-2.5">
+          <button
+            onClick={() => onVerify(card.id)}
+            disabled={card.verifying}
+            className="w-full py-2 px-3 rounded-lg text-xs font-medium transition-all
+              bg-[#fbbf24]/[0.08] hover:bg-[#fbbf24]/[0.14] text-[#fbbf24] border border-[#fbbf24]/20
+              disabled:opacity-50 disabled:cursor-not-allowed
+              flex items-center justify-center gap-2"
+          >
+            {card.verifying ? (
+              <>
+                <div className="w-3 h-3 border-[1.5px] border-[#fbbf24]/30 border-t-[#fbbf24] rounded-full spinner" />
+                Verifying…
+              </>
+            ) : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 12l2 2 4-4"/>
+                  <path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+                </svg>
+                Verify variant availability
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Show verified badge */}
+      {card.verified && (
+        <div className="bg-[var(--bg-secondary)] px-2.5 pb-2">
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+            <span className="text-[10px] text-[#4ade80]/60 uppercase tracking-wider">Verified via registrar</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function ResultsPage() {
   const router = useRouter();
-  const [cards, setCards] = useState<NameCard[]>([]);
+  const [cards, setCards] = useState<NameCardExt[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -254,6 +319,8 @@ export default function ResultsPage() {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const configRef = useRef<any>(null);
   const initialLoadDone = useRef(false);
+  const batchNumberRef = useRef(1);
+  const usedGradientIndices = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -271,9 +338,7 @@ export default function ResultsPage() {
     if (typeof window !== 'undefined') {
       const configStr = localStorage.getItem('nc_config');
       if (configStr) {
-        try {
-          configRef.current = JSON.parse(configStr);
-        } catch {}
+        try { configRef.current = JSON.parse(configStr); } catch {}
       }
       if (!configRef.current) {
         const desc = localStorage.getItem('nc_description') || '';
@@ -282,42 +347,105 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const checkDomains = useCallback(async (domainsToCheck: string[]) => {
-    if (domainsToCheck.length === 0) return;
+  // Check exact domain via WhoisXML (accurate, paid)
+  const checkExactDomain = useCallback(async (cardId: string, domain: string) => {
     try {
       const resp = await fetch('/api/check-domain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domains: domainsToCheck }),
+        body: JSON.stringify({ domains: [domain] }),
       });
       if (!resp.ok) return;
       const { results } = await resp.json();
 
-      setCards(prev =>
-        prev.map(card => {
-          const exactKey = card.exactDomain.domain;
-          let updated = { ...card };
-          if (results[exactKey] !== undefined) {
-            updated.exactDomain = { ...card.exactDomain, available: results[exactKey] };
-          }
-          updated.variantDomains = card.variantDomains.map(v =>
-            results[v.domain] !== undefined
-              ? { ...v, available: results[v.domain] }
-              : v
-          );
-          return updated;
-        })
-      );
+      setCards(prev => prev.map(card => {
+        if (card.id !== cardId) return card;
+        return {
+          ...card,
+          exactDomain: results[domain] !== undefined
+            ? { ...card.exactDomain, available: results[domain], method: 'whoisxml' as CheckMethod }
+            : card.exactDomain,
+        };
+      }));
     } catch (err) {
-      console.error('Domain check error:', err);
+      console.error('Exact domain check error:', err);
     }
   }, []);
+
+  // Check variant domains via DNS (free, fast, approximate)
+  const checkVariantDomains = useCallback(async (cardId: string, domains: string[]) => {
+    if (domains.length === 0) return;
+    try {
+      const resp = await fetch('/api/check-domain-dns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains }),
+      });
+      if (!resp.ok) return;
+      const { results } = await resp.json();
+
+      setCards(prev => prev.map(card => {
+        if (card.id !== cardId) return card;
+        return {
+          ...card,
+          variantDomains: card.variantDomains.map(v =>
+            results[v.domain] !== undefined
+              ? { ...v, available: results[v.domain], method: 'dns' as CheckMethod }
+              : v
+          ),
+        };
+      }));
+    } catch (err) {
+      console.error('DNS variant check error:', err);
+    }
+  }, []);
+
+  // Verify: re-check ALL variant domains via WhoisXML (accurate, paid)
+  const handleVerify = useCallback(async (cardId: string) => {
+    // Mark as verifying
+    setCards(prev => prev.map(c => c.id === cardId ? { ...c, verifying: true } : c));
+
+    // Get the card's variant domains
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const variantDomains = card.variantDomains.map(v => v.domain);
+
+    try {
+      const resp = await fetch('/api/check-domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains: variantDomains }),
+      });
+      if (!resp.ok) return;
+      const { results } = await resp.json();
+
+      setCards(prev => prev.map(c => {
+        if (c.id !== cardId) return c;
+        return {
+          ...c,
+          verifying: false,
+          verified: true,
+          variantDomains: c.variantDomains.map(v =>
+            results[v.domain] !== undefined
+              ? { ...v, available: results[v.domain], method: 'whoisxml' as CheckMethod }
+              : v
+          ),
+        };
+      }));
+    } catch (err) {
+      console.error('Verify error:', err);
+      setCards(prev => prev.map(c => c.id === cardId ? { ...c, verifying: false } : c));
+    }
+  }, [cards]);
 
   const generateBatch = useCallback(async () => {
     if (loadingRef.current || !configRef.current) return;
     loadingRef.current = true;
     setIsGenerating(true);
     setError(null);
+
+    const currentBatch = batchNumberRef.current;
 
     try {
       const resp = await fetch('/api/generate', {
@@ -326,7 +454,9 @@ export default function ResultsPage() {
         body: JSON.stringify({
           config: configRef.current,
           existingNames: existingNamesRef.current,
+          rejectedNames: existingNamesRef.current,
           batchSize: 10,
+          batchNumber: currentBatch,
         }),
       });
 
@@ -341,17 +471,20 @@ export default function ResultsPage() {
         (s: any) => !existingNamesRef.current.includes(s.name.toLowerCase())
       );
 
-      const newCards: NameCard[] = newSuggestions.map((s: any) => {
-        const style = generateCardStyle();
+      const newCards: NameCardExt[] = newSuggestions.map((s: any) => {
+        const style = generateCardStyle(usedGradientIndices.current);
         const nameLower = s.name.toLowerCase().replace(/\s+/g, '');
         return {
           id: `${nameLower}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: s.name,
-          exactDomain: { domain: nameLower, available: null },
+          exactDomain: { domain: nameLower, available: null, method: 'pending' as CheckMethod },
           variantDomains: (s.variants || []).map((v: string) => ({
             domain: v.toLowerCase().replace(/\s+/g, ''),
             available: null,
+            method: 'pending' as CheckMethod,
           })),
+          verified: false,
+          verifying: false,
           ...style,
         };
       });
@@ -361,12 +494,13 @@ export default function ResultsPage() {
       }
 
       setCards(prev => [...prev, ...newCards]);
+      batchNumberRef.current++;
 
-      const allDomains = newCards.flatMap(c => [
-        c.exactDomain.domain,
-        ...c.variantDomains.map(v => v.domain),
-      ]);
-      checkDomains(allDomains);
+      // Fire checks: WhoisXML for exact, DNS for variants
+      for (const card of newCards) {
+        checkExactDomain(card.id, card.exactDomain.domain);
+        checkVariantDomains(card.id, card.variantDomains.map(v => v.domain));
+      }
     } catch (err: any) {
       console.error('Generation error:', err);
       setError(err.message || 'Failed to generate names');
@@ -374,7 +508,7 @@ export default function ResultsPage() {
       setIsGenerating(false);
       loadingRef.current = false;
     }
-  }, [checkDomains]);
+  }, [checkExactDomain, checkVariantDomains]);
 
   useEffect(() => {
     if (!initialLoadDone.current) {
@@ -385,7 +519,6 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
-
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !loadingRef.current) {
@@ -394,47 +527,31 @@ export default function ResultsPage() {
       },
       { rootMargin: '400px' }
     );
-
-    if (sentinelRef.current) {
-      observerRef.current.observe(sentinelRef.current);
-    }
-
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
   }, [generateBatch]);
 
-  const handleSave = (card: NameCard) => {
+  const handleSave = (card: NameCardExt) => {
     if (typeof window === 'undefined') return;
-
     const saved: SavedName[] = JSON.parse(localStorage.getItem('nc_saved') || '[]');
     const exists = saved.some(s => s.name === card.name);
 
     if (exists) {
       const filtered = saved.filter(s => s.name !== card.name);
       localStorage.setItem('nc_saved', JSON.stringify(filtered));
-      setSavedNames(prev => {
-        const next = new Set(prev);
-        next.delete(card.name);
-        return next;
-      });
+      setSavedNames(prev => { const next = new Set(prev); next.delete(card.name); return next; });
     } else {
       const availableDomains = [
         ...(card.exactDomain.available ? [card.exactDomain.domain + '.com'] : []),
         ...card.variantDomains.filter(v => v.available).map(v => v.domain + '.com'),
       ];
       saved.push({
-        name: card.name,
-        savedAt: Date.now(),
-        gradient: card.gradient,
-        fontFamily: card.fontFamily,
-        textColor: card.textColor,
+        name: card.name, savedAt: Date.now(),
+        gradient: card.gradient, fontFamily: card.fontFamily, textColor: card.textColor,
         availableDomains,
       });
       localStorage.setItem('nc_saved', JSON.stringify(saved));
-      setSavedNames(prev => {
-        const arr = Array.from(prev);
-        arr.push(card.name);
-        return new Set(arr);
-      });
+      setSavedNames(prev => { const arr = Array.from(prev); arr.push(card.name); return new Set(arr); });
     }
   };
 
@@ -449,6 +566,7 @@ export default function ResultsPage() {
               card={card}
               index={i % 10}
               onSave={handleSave}
+              onVerify={handleVerify}
               isSaved={savedNames.has(card.name)}
             />
           ))}
@@ -457,10 +575,7 @@ export default function ResultsPage() {
         {error && (
           <div className="mt-6 p-4 bg-[#f87171]/10 border border-[#f87171]/30 rounded-xl text-center">
             <p className="text-[#f87171] text-sm mb-2">{error}</p>
-            <button
-              onClick={() => generateBatch()}
-              className="text-sm text-[var(--accent)] hover:underline"
-            >
+            <button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">
               Try again
             </button>
           </div>
