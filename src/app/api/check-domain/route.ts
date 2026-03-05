@@ -2,45 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { domains } = await req.json();
-
+    const { domains, tld = 'com' } = await req.json();
     if (!Array.isArray(domains) || domains.length === 0) {
       return NextResponse.json({ error: 'domains array required' }, { status: 400 });
     }
 
     const apiKey = process.env.WHOISXML_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'WHOISXML_API_KEY not configured' }, { status: 500 });
-    }
+    if (!apiKey) return NextResponse.json({ error: 'WHOISXML_API_KEY not configured' }, { status: 500 });
 
     const results: Record<string, boolean> = {};
 
     const promises = domains.map(async (domain: string) => {
       try {
-        const cleanDomain = domain.toLowerCase().replace(/\s+/g, '');
-        const fullDomain = cleanDomain.includes('.') ? cleanDomain : `${cleanDomain}.com`;
-
+        const clean = domain.toLowerCase().replace(/\s+/g, '');
+        const full = clean.includes('.') ? clean : `${clean}.${tld}`;
         const resp = await fetch(
-          `https://domain-availability.whoisxmlapi.com/api/v1?apiKey=${apiKey}&domainName=${encodeURIComponent(fullDomain)}&credits=DA`,
+          `https://domain-availability.whoisxmlapi.com/api/v1?apiKey=${apiKey}&domainName=${encodeURIComponent(full)}&credits=DA`,
           { signal: AbortSignal.timeout(8000) }
         );
-
-        if (!resp.ok) {
-          console.error(`WhoisXML check failed for ${fullDomain}: ${resp.status}`);
-          results[domain] = false;
-          return;
-        }
-
+        if (!resp.ok) { results[domain] = false; return; }
         const data = await resp.json();
         results[domain] = data?.DomainInfo?.domainAvailability === 'AVAILABLE';
-      } catch (err) {
-        console.error(`WhoisXML check error for ${domain}:`, err);
-        results[domain] = false;
-      }
+      } catch { results[domain] = false; }
     });
 
     await Promise.all(promises);
-
     return NextResponse.json({ results });
   } catch (err) {
     console.error('Check-domain error:', err);
