@@ -51,11 +51,13 @@ export function pickTextColor(gradient: string): string {
   return bestColor;
 }
 
-// Colorblind-safe status colors (Okabe-Ito inspired)
-// These are distinguishable by people with protanopia, deuteranopia, tritanopia
+// Status colors:
+// - Blue for DNS "likely free" estimates
+// - Green for WhoisXML confirmed available
+// - Pink/muted for taken
 export const STATUS_COLORS = {
-  available: { bg: 'rgba(0, 114, 178, 0.10)', border: 'rgba(0, 114, 178, 0.5)', text: '#0072B2', dot: '#0072B2', glow: 'rgba(0, 114, 178, 0.08)' },
-  variantAvailable: { bg: 'rgba(230, 159, 0, 0.08)', border: 'rgba(230, 159, 0, 0.4)', text: '#E69F00', dot: '#E69F00', glow: 'rgba(230, 159, 0, 0.06)' },
+  confirmed: { bg: 'rgba(34, 197, 94, 0.10)', border: 'rgba(34, 197, 94, 0.5)', text: '#22c55e', dot: '#22c55e', glow: 'rgba(34, 197, 94, 0.08)' },
+  likelyFree: { bg: 'rgba(0, 114, 178, 0.10)', border: 'rgba(0, 114, 178, 0.4)', text: '#0072B2', dot: '#0072B2', glow: 'rgba(0, 114, 178, 0.06)' },
   taken: { bg: 'rgba(204, 121, 167, 0.06)', border: 'rgba(204, 121, 167, 0.25)', text: '#CC79A7', dot: '#CC79A7', glow: 'transparent' },
   loading: { bg: 'rgba(255,255,255,0.04)', border: 'rgba(42, 42, 58, 1)', text: '#666', dot: '#444', glow: 'transparent' },
 };

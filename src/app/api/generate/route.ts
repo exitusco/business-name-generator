@@ -79,9 +79,10 @@ For each name, generate 1-7 domain variants (prefix/suffix combos). CRITICAL:
 Return ONLY a JSON array. Each object:
 - "name": business name (no .${tld})
 - "category": one of the category IDs above
+- "rationale": 1 sentence (max 15 words) explaining why this name fits the business. Be specific, not generic.
 - "variants": array of domain strings without .${tld}
 
-Example: [{"name":"Luminary","category":"elegant","variants":["tryluminary","goluminary"]},{"name":"Bolt","category":"short","variants":["getbolt","bolthq"]}]`;
+Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance and leadership in the consulting space.","variants":["tryluminary","goluminary"]},{"name":"Bolt","category":"short","rationale":"Suggests speed and reliability for a logistics platform.","variants":["getbolt","bolthq"]}]`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -130,7 +131,7 @@ Example: [{"name":"Luminary","category":"elegant","variants":["tryluminary","gol
           const p = nameLower[0] !== 't' ? 'try' : 'get';
           variants = [`${p}${nameLower}`];
         }
-        return { name, category: s.category || 'invented', variants };
+        return { name, category: s.category || 'invented', rationale: typeof s.rationale === 'string' ? s.rationale.slice(0, 120) : '', variants };
       });
 
     return NextResponse.json({ suggestions: sanitized });

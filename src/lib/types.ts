@@ -7,7 +7,8 @@ export interface DomainCheck {
 export interface NameCardData {
   id: string;
   name: string;
-  category: string; // which naming style it is
+  category: string;
+  rationale: string;
   exactDomain: DomainCheck;
   variantDomains: DomainCheck[];
   gradient: string;
