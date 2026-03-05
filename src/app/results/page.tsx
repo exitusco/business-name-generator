@@ -106,12 +106,21 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
   const [tldInput, setTldInput] = useState('');
   const [addingTld, setAddingTld] = useState(false);
 
-  // Load TLD checks on open
+  // Reset local state when card changes
+  useEffect(() => {
+    setVariantTld(card.variantTld || defaultTld);
+    setLoadingVariants(false);
+    setVerifying(false);
+    setTldInput('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.id]);
+
+  // Load TLD checks on open or when card changes
   useEffect(() => {
     if (card.tldChecks.length > 0) return;
     loadTldChecks(DEFAULT_EXPLORE_TLDS.includes(defaultTld) ? DEFAULT_EXPLORE_TLDS : [defaultTld, ...DEFAULT_EXPLORE_TLDS.filter(t => t !== defaultTld)]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [card.id]);
 
   const loadTldChecks = async (tlds: string[]) => {
     const nl = card.name.toLowerCase().replace(/\s+/g, '');
@@ -482,7 +491,19 @@ export default function ResultsPage() {
           {cards.map((c, i) => <GridCard key={c.id} card={c} index={i % 10} onSave={handleSave} onExplore={() => setActiveCardId(c.id)} isSaved={savedNames.has(c.name)} tld={tld} />)}
         </div>
         {error && <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center"><p className="text-red-400 text-sm mb-2">{error}</p><button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">Try again</button></div>}
-        {isGenerating && <div className="flex items-center justify-center gap-3 py-12"><div className="w-5 h-5 border-2 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full spinner" /><span className="text-sm text-[var(--text-secondary)]">Generating more names&hellip;</span></div>}
+        {isGenerating && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="rounded-2xl overflow-hidden border-2 border-[var(--border)]" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="h-40 sm:h-48 bg-[var(--bg-elevated)] pulse" />
+                <div className="bg-[var(--bg-secondary)] px-4 py-3 space-y-2">
+                  <div className="h-3 bg-white/[0.05] rounded w-3/4 pulse" />
+                  <div className="h-3 bg-white/[0.05] rounded w-1/2 pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         <div ref={sentinelRef} className="h-4" />
       </main>
       {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} />}
