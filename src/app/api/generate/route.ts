@@ -99,7 +99,8 @@ Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance
         model,
         messages: [{ role: 'user', content: prompt }],
         temperature: Math.min(0.95 + (batchNumber * 0.03), 1.3),
-        max_tokens: 2500,
+        max_tokens: 16000,
+        reasoning: { max_tokens: 1024 },
       }),
     });
 

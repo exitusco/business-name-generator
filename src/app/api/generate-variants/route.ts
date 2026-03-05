@@ -42,7 +42,7 @@ Return ONLY a JSON array of strings (no .${tld} suffix). Example: ["getluminary"
       },
       body: JSON.stringify({
         model, messages: [{ role: 'user', content: prompt }],
-        temperature: 0.9, max_tokens: 500,
+        temperature: 0.9, max_tokens: 4000, reasoning: { max_tokens: 512 },
       }),
     });
 
