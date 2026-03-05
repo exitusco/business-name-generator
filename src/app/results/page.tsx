@@ -382,12 +382,6 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
   );
 }
 
-function statusColor(available: boolean | null, method: CM) {
-  if (available === null) return SC.loading;
-  if (!available) return SC.taken;
-  return method === 'whoisxml' ? SC.confirmed : SC.likelyFree;
-}
-
 // ===== MAIN =====
 export default function ResultsPage() {
   const [cards, setCards] = useState<CardData[]>([]);
