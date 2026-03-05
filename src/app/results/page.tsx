@@ -434,11 +434,16 @@ export default function ResultsPage() {
   }, []);
 
   const generateBatch = useCallback(async () => {
-    if (loadingRef.current || !configRef.current) return;
+    if (loadingRef.current) return;
+    if (!configRef.current) {
+      // Try to load config if it wasn't ready
+      try { const c = localStorage.getItem('nc_config'); if (c) configRef.current = JSON.parse(c); } catch {}
+      if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
+    }
     loadingRef.current = true; setIsGenerating(true); setError(null);
     try {
       const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: configRef.current, existingNames: existingNamesRef.current, rejectedNames: existingNamesRef.current, batchSize: 10, batchNumber: batchNumberRef.current }) });
+        body: JSON.stringify({ config: configRef.current, existingNames: existingNamesRef.current, rejectedNames: existingNamesRef.current, batchSize: 10, batchNumber: batchNumberRef.current, nonce: Math.random().toString(36).slice(2, 10) }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Failed'); }
       const { suggestions } = await r.json();
       const ct = configRef.current?.tld || 'com';
@@ -458,7 +463,10 @@ export default function ResultsPage() {
   useEffect(() => { if (!initialLoadDone.current) { initialLoadDone.current = true; setTimeout(() => generateBatch(), 100); } }, [generateBatch]);
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver((e) => { if (e[0].isIntersecting && !loadingRef.current) generateBatch(); }, { rootMargin: '400px' });
+    observerRef.current = new IntersectionObserver(
+      (entries) => { if (entries.some(e => e.isIntersecting) && !loadingRef.current) generateBatch(); },
+      { rootMargin: '600px', threshold: 0 }
+    );
     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
   }, [generateBatch]);
@@ -489,22 +497,33 @@ export default function ResultsPage() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {cards.map((c, i) => <GridCard key={c.id} card={c} index={i % 10} onSave={handleSave} onExplore={() => setActiveCardId(c.id)} isSaved={savedNames.has(c.name)} tld={tld} />)}
-        </div>
-        {error && <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center"><p className="text-red-400 text-sm mb-2">{error}</p><button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">Try again</button></div>}
-        {isGenerating && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="rounded-2xl overflow-hidden border-2 border-[var(--border)]" style={{ animationDelay: `${i * 100}ms` }}>
+          {/* Skeleton cards that fill the partial row + next full row */}
+          {isGenerating && (() => {
+            const cols = 3; // max columns at lg
+            const remainder = cards.length % cols;
+            const fillCount = remainder === 0 ? cols : (cols - remainder) + cols;
+            return [...Array(Math.min(fillCount, 9))].map((_, i) => (
+              <div key={`skel-${i}`} className="rounded-2xl overflow-hidden border-2 border-[var(--border)]">
                 <div className="h-40 sm:h-48 bg-[var(--bg-elevated)] pulse" />
                 <div className="bg-[var(--bg-secondary)] px-4 py-3 space-y-2">
                   <div className="h-3 bg-white/[0.05] rounded w-3/4 pulse" />
                   <div className="h-3 bg-white/[0.05] rounded w-1/2 pulse" />
                 </div>
               </div>
-            ))}
+            ));
+          })()}
+        </div>
+        {error && <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center"><p className="text-red-400 text-sm mb-2">{error}</p><button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">Try again</button></div>}
+        {/* Manual load more button as fallback for when observer doesn't trigger */}
+        {!isGenerating && cards.length > 0 && (
+          <div className="flex justify-center py-8">
+            <button onClick={() => generateBatch()}
+              className="px-6 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent-dim)] transition-all">
+              Load more names
+            </button>
           </div>
         )}
-        <div ref={sentinelRef} className="h-4" />
+        <div ref={sentinelRef} className="h-20" />
       </main>
       {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} />}
     </div>

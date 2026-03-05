@@ -5,11 +5,14 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { config, existingNames = [], rejectedNames = [], batchSize = 10, batchNumber = 1 } = body;
+    const { config, existingNames = [], rejectedNames = [], batchSize = 10, batchNumber = 1, nonce = '' } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
     if (!apiKey) return NextResponse.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
+
+    // Random seed to ensure different outputs even with identical prompts
+    const seed = nonce || Math.random().toString(36).slice(2, 10);
 
     const tld = config.tld || 'com';
 
@@ -59,7 +62,8 @@ NAMING PREFERENCES:
 
 ${obscurityDirective}
 
-CREATIVITY (batch ${batchNumber}): ${creativityDirective}
+CREATIVITY (batch ${batchNumber}, seed ${seed}): ${creativityDirective}
+IMPORTANT: Generate completely DIFFERENT names each time, even for the same business description. Be surprising and varied.
 
 ${existingNames.length > 0 ? `ALREADY SUGGESTED (do NOT repeat): ${existingNames.join(', ')}` : ''}
 ${rejectedNames.length > 0 ? `PREVIOUSLY REJECTED (try different approaches): ${rejectedNames.join(', ')}` : ''}
@@ -94,7 +98,7 @@ Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        temperature: Math.min(0.85 + (batchNumber * 0.03), 1.2),
+        temperature: Math.min(0.95 + (batchNumber * 0.03), 1.3),
         max_tokens: 2500,
       }),
     });
