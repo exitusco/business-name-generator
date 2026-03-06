@@ -2,16 +2,21 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 
-export default function Header() {
+interface HeaderProps {
+  onRefresh?: () => void;
+}
+
+export default function Header({ onRefresh }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const isHome = pathname === '/';
+  const isResults = pathname === '/results';
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0a0f]/80 border-b border-[var(--border)]">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Left side */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {!isHome && (
             <button
               onClick={() => router.push('/')}
@@ -20,8 +25,23 @@ export default function Header() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
               </svg>
-              Start over
+              <span className="hidden sm:inline">Start over</span>
             </button>
+          )}
+          {isResults && onRefresh && (
+            <>
+              <div className="w-px h-4 bg-[var(--border)]" />
+              <button
+                onClick={onRefresh}
+                className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1.5"
+                title="Clear all names and chat, keep settings and saved names"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                </svg>
+                <span className="hidden sm:inline">Fresh start</span>
+              </button>
+            </>
           )}
         </div>
 

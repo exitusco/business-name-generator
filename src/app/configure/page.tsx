@@ -224,7 +224,7 @@ export default function ConfigurePage() {
         {/* Submit */}
         <div className="fixed bottom-0 left-0 right-0 bg-[#0a0a0f]/90 backdrop-blur-xl border-t border-[var(--border)] p-4">
           <div className="max-w-2xl mx-auto flex gap-3">
-            <button onClick={() => router.push('/')}
+            <button onClick={() => router.back()}
               className="px-5 py-3 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors border border-[var(--border)]">
               Back
             </button>

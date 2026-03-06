@@ -439,12 +439,56 @@ export default function ResultsPage() {
   useEffect(() => { chatMessagesRef.current = chatMessages; }, [chatMessages]);
   useEffect(() => { cardsLenRef.current = cards.length; }, [cards.length]);
 
+  // Persist state to sessionStorage so navigating to settings and back preserves everything
+  useEffect(() => {
+    if (cards.length > 0) {
+      try { sessionStorage.setItem('nc_cards', JSON.stringify(cards)); } catch {}
+    }
+  }, [cards]);
+  useEffect(() => {
+    if (Object.keys(dividers).length > 0) {
+      try { sessionStorage.setItem('nc_dividers', JSON.stringify(dividers)); } catch {}
+    }
+  }, [dividers]);
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      try { sessionStorage.setItem('nc_chat', JSON.stringify(chatMessages)); } catch {}
+    }
+  }, [chatMessages]);
+  useEffect(() => {
+    if (existingNamesRef.current.length > 0) {
+      try { sessionStorage.setItem('nc_existing', JSON.stringify(existingNamesRef.current)); } catch {}
+      try { sessionStorage.setItem('nc_batch', String(batchNumberRef.current)); } catch {}
+    }
+  }, [cards.length]); // piggyback on cards changing
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try { const s = localStorage.getItem('nc_saved'); if (s) setSavedNames(new Set(JSON.parse(s).map((x: SavedName) => x.name))); } catch {}
       try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); } } catch {}
       if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
       if (window.innerWidth < 640) setChatOpen(false);
+
+      // Restore state from sessionStorage if available
+      try {
+        const savedCards = sessionStorage.getItem('nc_cards');
+        const savedDividers = sessionStorage.getItem('nc_dividers');
+        const savedChat = sessionStorage.getItem('nc_chat');
+        const savedExisting = sessionStorage.getItem('nc_existing');
+        const savedBatch = sessionStorage.getItem('nc_batch');
+
+        if (savedCards) {
+          const parsed = JSON.parse(savedCards);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCards(parsed);
+            initialLoadDone.current = true; // skip initial generation
+          }
+        }
+        if (savedDividers) setDividers(JSON.parse(savedDividers));
+        if (savedChat) setChatMessages(JSON.parse(savedChat));
+        if (savedExisting) existingNamesRef.current = JSON.parse(savedExisting);
+        if (savedBatch) batchNumberRef.current = parseInt(savedBatch) || 1;
+      } catch {}
     }
   }, []);
 
@@ -609,30 +653,35 @@ export default function ResultsPage() {
       configRef.current[change.field] = change.value;
     }
 
-    // Persist to localStorage
     localStorage.setItem('nc_config', JSON.stringify(configRef.current));
-
-    // Update TLD if that changed
     if (change.field === 'tld') setTld(change.value);
 
-    // System event
+    // System event for this individual change
     const eventMsg: ChatMsg = {
-      id: `event-cfg-${Date.now()}`, role: 'system-event',
+      id: `event-cfg-${Date.now()}-${changeIndex}`, role: 'system-event',
       content: `Updated ${change.label} → ${change.displayValue}`, timestamp: Date.now(),
     };
     setChatMessages(prev => [...prev, eventMsg]);
 
-    // Generate new names with updated config
-    const genEvent: ChatMsg = {
-      id: `event-gen-cfg-${Date.now()}`, role: 'system-event',
-      content: 'Generating new names with updated settings...', timestamp: Date.now(),
-    };
-    setChatMessages(prev => [...prev, genEvent]);
-    generateBatch(`Updated ${change.label} to ${change.displayValue}`);
+    // Check if all suggestions in this message are now dispositioned
+    // We need to check the updated state, so compute it manually
+    const updatedSuggestions = msg.suggestedChanges!.map((sc, i) =>
+      i === changeIndex ? { ...sc, status: 'accepted' as const } : sc
+    );
+    const allDispositioned = updatedSuggestions.every(sc => sc.status !== 'pending');
+    const anyAccepted = updatedSuggestions.some(sc => sc.status === 'accepted');
+
+    if (allDispositioned && anyAccepted) {
+      const genEvent: ChatMsg = {
+        id: `event-gen-cfg-${Date.now()}`, role: 'system-event',
+        content: 'Generating new names with updated settings...', timestamp: Date.now(),
+      };
+      setChatMessages(prev => [...prev, genEvent]);
+      generateBatch('Updated settings based on your preferences');
+    }
   }, [chatMessages, generateBatch]);
 
   const handleRejectChange = useCallback((msgId: string, changeIndex: number) => {
-    // Mark as rejected
     setChatMessages(prev => prev.map(msg => {
       if (msg.id !== msgId || !msg.suggestedChanges) return msg;
       const updated = [...msg.suggestedChanges];
@@ -640,18 +689,33 @@ export default function ResultsPage() {
       return { ...msg, suggestedChanges: updated };
     }));
 
-    // Find the change details for context
     const msg = chatMessages.find(m => m.id === msgId);
     const change = msg?.suggestedChanges?.[changeIndex];
     if (!change) return;
 
-    // Send rejection as system event so the AI knows
     const eventMsg: ChatMsg = {
-      id: `event-reject-${Date.now()}`, role: 'system-event',
-      content: `Rejected suggestion: ${change.label} → ${change.displayValue}`, timestamp: Date.now(),
+      id: `event-reject-${Date.now()}-${changeIndex}`, role: 'system-event',
+      content: `Rejected: ${change.label} → ${change.displayValue}`, timestamp: Date.now(),
     };
     setChatMessages(prev => [...prev, eventMsg]);
-  }, [chatMessages]);
+
+    // Check if all suggestions in this message are now dispositioned
+    const updatedSuggestions = msg.suggestedChanges!.map((sc, i) =>
+      i === changeIndex ? { ...sc, status: 'rejected' as const } : sc
+    );
+    const allDispositioned = updatedSuggestions.every(sc => sc.status !== 'pending');
+    const anyAccepted = updatedSuggestions.some(sc => sc.status === 'accepted');
+
+    // Only generate if at least one was accepted
+    if (allDispositioned && anyAccepted) {
+      const genEvent: ChatMsg = {
+        id: `event-gen-cfg-${Date.now()}`, role: 'system-event',
+        content: 'Generating new names with updated settings...', timestamp: Date.now(),
+      };
+      setChatMessages(prev => [...prev, genEvent]);
+      generateBatch('Updated settings based on your preferences');
+    }
+  }, [chatMessages, generateBatch]);
 
   // Build grid with dividers
   const gridItems: Array<{ type: 'card'; card: CardData; index: number } | { type: 'divider'; text: string; id: number }> = [];
@@ -660,9 +724,31 @@ export default function ResultsPage() {
     gridItems.push({ type: 'card', card: c, index: i });
   });
 
+  // Fresh start: clear names, chat, dividers — keep saved names and settings
+  const handleRefresh = useCallback(() => {
+    setCards([]);
+    setDividers({});
+    setChatMessages([]);
+    setActiveCardId(null);
+    setError(null);
+    existingNamesRef.current = [];
+    batchNumberRef.current = 1;
+    loadingRef.current = false;
+    usedGrad.current.clear();
+    try {
+      sessionStorage.removeItem('nc_cards');
+      sessionStorage.removeItem('nc_dividers');
+      sessionStorage.removeItem('nc_chat');
+      sessionStorage.removeItem('nc_existing');
+      sessionStorage.removeItem('nc_batch');
+    } catch {}
+    // Trigger a fresh batch
+    setTimeout(() => generateBatch(), 100);
+  }, [generateBatch]);
+
   return (
     <div className="min-h-screen">
-      <Header />
+      <Header onRefresh={handleRefresh} />
       <div className="flex">
         <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
           <div className="max-w-6xl mx-auto">
