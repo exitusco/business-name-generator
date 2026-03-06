@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { trackUsage } from '@/lib/supabase/usage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +29,15 @@ export async function POST(req: NextRequest) {
     });
 
     await Promise.all(promises);
+
+    // Track usage
+    const { userId: clerkUserId } = await auth();
+    const anonymousId = req.cookies.get('nc_anon_id')?.value || null;
+    const checkCount = Object.keys(results).length;
+    if (checkCount > 0) {
+      trackUsage(clerkUserId, anonymousId, 'domain_check', checkCount).catch(() => {});
+    }
+
     return NextResponse.json({ results });
   } catch (err) {
     console.error('Check-domain error:', err);

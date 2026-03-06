@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { trackUsage } from '@/lib/supabase/usage';
 
 export const maxDuration = 60;
 
@@ -166,6 +168,13 @@ OUTPUT FORMAT — Return ONLY a JSON array. No markdown. No explanation. Each ob
         }
         return { name, category: s.category || 'invented', rationale: typeof s.rationale === 'string' ? s.rationale.slice(0, 150) : '', variants };
       });
+
+    // Track usage (don't block response on this)
+    const { userId: clerkUserId } = await auth();
+    const anonymousId = req.cookies.get('nc_anon_id')?.value || null;
+    if (sanitized.length > 0) {
+      trackUsage(clerkUserId, anonymousId, 'generation', sanitized.length).catch(() => {});
+    }
 
     return NextResponse.json({ suggestions: sanitized });
   } catch (err) {
