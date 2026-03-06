@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import ChatSidebar from '@/components/ChatSidebar';
-import ModelSelector from '@/components/ModelSelector';
 import { UpgradePrompt, ProBadge } from '@/components/ProGate';
 import { useFeatures } from '@/hooks/useFeatures';
 import type { ChatMsg } from '@/components/ChatSidebar';
-import { DEFAULT_FREE_MODEL } from '@/lib/features';
+import { DEFAULT_FREE_MODEL, AI_MODELS } from '@/lib/features';
 import { NameCardData, DomainCheck, SavedName, CARD_FONTS, GRADIENTS, CATEGORY_COLORS, COMMON_TLDS } from '@/lib/types';
 import { pickTextColor, STATUS_COLORS as SC } from '@/lib/colors';
 import { partitionCached, setCache } from '@/lib/domain-cache';
@@ -319,7 +319,7 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
         {/* TLD exploration */}
         <div>
           <h3 className="text-xs font-medium text-white/50 uppercase tracking-wider mb-2">{card.name.toLowerCase()}.___</h3>
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto px-1 -mx-1">
             {card.tldChecks.map(tc => <DomainRow key={tc.domain} domain={tc.domain} tld="" available={tc.available} method={tc.method} />)}
           </div>
           {/* Add more TLDs */}
@@ -350,7 +350,7 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
               </select>
             </div>
           </div>
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto px-1 -mx-1">
             <DomainRow domain={card.exactDomain.domain} tld={variantTld} available={card.exactDomain.available} method={card.exactDomain.method} />
             {card.variantDomains.map(v => <DomainRow key={v.domain} domain={v.domain} tld={variantTld} available={v.available} method={v.method} />)}
           </div>
@@ -426,6 +426,7 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
 
 // ===== MAIN =====
 export default function ResultsPage() {
+  const router = useRouter();
   const features = useFeatures();
   const [selectedModel, setSelectedModel] = useState(features.defaultModel);
   const selectedModelRef = useRef(features.defaultModel);
@@ -487,7 +488,7 @@ export default function ResultsPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try { const s = localStorage.getItem('nc_saved'); if (s) setSavedNames(new Set(JSON.parse(s).map((x: SavedName) => x.name))); } catch {}
-      try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); } } catch {}
+      try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); if (configRef.current.selectedModel) { setSelectedModel(configRef.current.selectedModel); selectedModelRef.current = configRef.current.selectedModel; } } } catch {}
       if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
       if (window.innerWidth < 640) setChatOpen(false);
 
@@ -812,9 +813,20 @@ export default function ResultsPage() {
       <div className="flex">
         <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
           <div className="max-w-6xl mx-auto">
-            {/* Model selector bar */}
-            <div className="flex items-center justify-between mb-4">
-              <ModelSelector selectedModel={selectedModel} onSelect={setSelectedModel} availableModels={features.availableModels} />
+            {/* Current model indicator */}
+            <div className="flex items-center gap-3 mb-4 text-xs text-[var(--text-secondary)]">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+                <span>{AI_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown model'}</span>
+                <span className="text-[var(--text-secondary)]/40">·</span>
+                <span className="text-[var(--text-secondary)]/40">{AI_MODELS.find(m => m.id === selectedModel)?.provider}</span>
+              </div>
+              <button
+                onClick={() => router.push('/configure')}
+                className="text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors underline underline-offset-2 decoration-[var(--accent)]/20 hover:decoration-[var(--accent)]/50"
+              >
+                change model
+              </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {gridItems.map((item) => {
