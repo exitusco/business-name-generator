@@ -78,17 +78,6 @@ export default function Home() {
               )}
             </button>
           </div>
-
-          {/* Saved names link */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => router.push('/saved')}
-              className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors underline underline-offset-4 decoration-[var(--border)] hover:decoration-[var(--accent)]"
-            >
-              return to my saved names&hellip;
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

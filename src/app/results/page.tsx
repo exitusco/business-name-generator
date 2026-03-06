@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import ChatSidebar from '@/components/ChatSidebar';
+import ModelSelector from '@/components/ModelSelector';
+import { UpgradePrompt, ProBadge } from '@/components/ProGate';
+import { useFeatures } from '@/hooks/useFeatures';
 import type { ChatMsg } from '@/components/ChatSidebar';
+import { DEFAULT_FREE_MODEL } from '@/lib/features';
 import { NameCardData, DomainCheck, SavedName, CARD_FONTS, GRADIENTS, CATEGORY_COLORS, COMMON_TLDS } from '@/lib/types';
 import { pickTextColor, STATUS_COLORS as SC } from '@/lib/colors';
 import { partitionCached, setCache } from '@/lib/domain-cache';
@@ -94,10 +98,11 @@ function DomainRow({ domain, tld, available, method }: { domain: string; tld: st
 }
 
 // ===== DETAIL TRAY / MODAL =====
-function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, chatOpen }: {
+function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, chatOpen, advancedAvailability, extraVariants }: {
   card: CardData; defaultTld: string; onClose: () => void;
   onUpdate: (updater: (c: CardData) => CardData) => void;
   onSave: () => void; isSaved: boolean; chatOpen: boolean;
+  advancedAvailability: boolean; extraVariants: boolean;
 }) {
   const configRef = useRef<any>(null);
   useEffect(() => { try { configRef.current = JSON.parse(localStorage.getItem('nc_config') || '{}'); } catch {} }, []);
@@ -220,7 +225,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, cha
         <PanelContent card={card} catColor={catColor} variantTld={variantTld} recheckingTld={recheckingTld}
           loadingVariants={loadingVariants} verifying={verifying} avAll={avAll} hasUnverified={hasUnverified}
           tldInput={tldInput} setTldInput={setTldInput} addingTld={addingTld}
-          onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} />
+          onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} advancedAvailability={advancedAvailability} extraVariants={extraVariants} />
       </div>
 
       {/* Desktop: bottom tray */}
@@ -242,7 +247,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, cha
             <PanelContent card={card} catColor={catColor} variantTld={variantTld} recheckingTld={recheckingTld}
               loadingVariants={loadingVariants} verifying={verifying} avAll={avAll} hasUnverified={hasUnverified}
               tldInput={tldInput} setTldInput={setTldInput} addingTld={addingTld}
-              onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} />
+              onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} advancedAvailability={advancedAvailability} extraVariants={extraVariants} />
           </div>
         </div>
       </div>
@@ -251,10 +256,11 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, cha
 }
 
 // Shared panel content used by both mobile fullscreen and desktop tray
-function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVariants, verifying, avAll, hasUnverified, tldInput, setTldInput, addingTld, onTldChange, onAddTld, onMoreVariants, onVerifyAll, onSave, isSaved, defaultTld }: {
+function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVariants, verifying, avAll, hasUnverified, tldInput, setTldInput, addingTld, onTldChange, onAddTld, onMoreVariants, onVerifyAll, onSave, isSaved, defaultTld, advancedAvailability, extraVariants }: {
   card: CardData; catColor: string; variantTld: string; recheckingTld: boolean; loadingVariants: boolean; verifying: boolean; avAll: number; hasUnverified: boolean;
   tldInput: string; setTldInput: (v: string) => void; addingTld: boolean;
   onTldChange: (t: string) => void; onAddTld: () => void; onMoreVariants: () => void; onVerifyAll: () => void; onSave: () => void; isSaved: boolean; defaultTld: string;
+  advancedAvailability: boolean; extraVariants: boolean;
 }) {
   return (
     <div className="p-5 sm:p-6">
@@ -296,12 +302,16 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
           </span>}
         </div>
         {hasUnverified && !card.verified && (
-          <button onClick={onVerifyAll} disabled={verifying} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 disabled:opacity-40"
-            style={{ background: SC.confirmed.bg, color: SC.confirmed.text, border: `1px solid ${SC.confirmed.border}` }}>
-            {verifying ? <div className="w-3 h-3 border-[1.5px] rounded-full spinner" style={{ borderColor: SC.confirmed.text + '40', borderTopColor: SC.confirmed.text }} /> :
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>}
-            Verify all
-          </button>
+          advancedAvailability ? (
+            <button onClick={onVerifyAll} disabled={verifying} className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 disabled:opacity-40"
+              style={{ background: SC.confirmed.bg, color: SC.confirmed.text, border: `1px solid ${SC.confirmed.border}` }}>
+              {verifying ? <div className="w-3 h-3 border-[1.5px] rounded-full spinner" style={{ borderColor: SC.confirmed.text + '40', borderTopColor: SC.confirmed.text }} /> :
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>}
+              Verify all
+            </button>
+          ) : (
+            <UpgradePrompt feature="Verify domains" compact />
+          )
         )}
       </div>
 
@@ -344,12 +354,18 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
             <DomainRow domain={card.exactDomain.domain} tld={variantTld} available={card.exactDomain.available} method={card.exactDomain.method} />
             {card.variantDomains.map(v => <DomainRow key={v.domain} domain={v.domain} tld={variantTld} available={v.available} method={v.method} />)}
           </div>
-          <button onClick={onMoreVariants} disabled={loadingVariants}
-            className="w-full mt-2 py-2 rounded-lg text-xs font-medium transition-all bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white/70 disabled:opacity-40 flex items-center justify-center gap-1.5">
-            {loadingVariants ? <div className="w-3 h-3 border-[1.5px] border-white/20 border-t-white/50 rounded-full spinner" /> :
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>}
-            Generate more variants
-          </button>
+          {extraVariants ? (
+            <button onClick={onMoreVariants} disabled={loadingVariants}
+              className="w-full mt-2 py-2 rounded-lg text-xs font-medium transition-all bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white/70 disabled:opacity-40 flex items-center justify-center gap-1.5">
+              {loadingVariants ? <div className="w-3 h-3 border-[1.5px] border-white/20 border-t-white/50 rounded-full spinner" /> :
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>}
+              Generate more variants
+            </button>
+          ) : (
+            <div className="mt-2">
+              <UpgradePrompt feature="Generate more variants" compact />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -410,6 +426,11 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
 
 // ===== MAIN =====
 export default function ResultsPage() {
+  const features = useFeatures();
+  const [selectedModel, setSelectedModel] = useState(features.defaultModel);
+  const selectedModelRef = useRef(features.defaultModel);
+  useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
+
   const [cards, setCards] = useState<CardData[]>([]);
   const [dividers, setDividers] = useState<Record<number, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -520,6 +541,7 @@ export default function ResultsPage() {
         body: JSON.stringify({
           config: configRef.current, existingNames: existingNamesRef.current, savedNames: Array.from(savedNames), batchSize: 10,
           nonce: Math.random().toString(36).slice(2, 10),
+          model: selectedModelRef.current,
           chatHistory: chatMessagesRef.current.slice(-20).map(m => ({ role: m.role, content: m.content })),
         }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Failed'); }
@@ -549,7 +571,7 @@ export default function ResultsPage() {
       const userMsgCount = chatMessagesRef.current.filter(m => m.role === 'user').length;
       const savedCount = savedNames.size;
       // Trigger every 30 names, but only if user hasn't chatted recently and has saved fewer than expected
-      if (totalShown - lastCheckIn >= 30 && !dividerText) {
+      if (totalShown - lastCheckIn >= 30 && !dividerText && features.aiChat) {
         lastCheckInRef.current = totalShown;
         // Fire async — don't block
         (async () => {
@@ -642,25 +664,27 @@ export default function ResultsPage() {
       localStorage.setItem('nc_saved', JSON.stringify(saved));
       setSavedNames(prev => { const a = Array.from(prev); a.push(card.name); return new Set(a); });
 
-      // Chat: system event + AI reaction
+      // Chat: system event (always show) + AI reaction (pro only)
       const eventMsg: ChatMsg = { id: `event-${Date.now()}`, role: 'system-event', content: `Saved "${card.name}"`, timestamp: Date.now() };
       setChatMessages(prev => [...prev, eventMsg]);
 
-      (async () => {
-        setChatLoading(true);
-        try {
-          const { message, suggestedChanges = [] } = await callChatApi([...chatMessagesRef.current, eventMsg], [card.name]);
-          if (message || suggestedChanges.length > 0) {
-            const aiMsg: ChatMsg = {
-              id: `ai-${Date.now()}`, role: 'assistant', content: message || '', timestamp: Date.now(),
-              suggestedChanges: suggestedChanges.map((sc: any) => ({ ...sc, status: 'pending' as const })),
-            };
-            setChatMessages(prev => [...prev, aiMsg]);
-            if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
-          }
-          // Hard guardrail: saves never trigger new name generation
-        } catch {} finally { setChatLoading(false); }
-      })();
+      if (features.aiChat) {
+        (async () => {
+          setChatLoading(true);
+          try {
+            const { message, suggestedChanges = [] } = await callChatApi([...chatMessagesRef.current, eventMsg], [card.name]);
+            if (message || suggestedChanges.length > 0) {
+              const aiMsg: ChatMsg = {
+                id: `ai-${Date.now()}`, role: 'assistant', content: message || '', timestamp: Date.now(),
+                suggestedChanges: suggestedChanges.map((sc: any) => ({ ...sc, status: 'pending' as const })),
+              };
+              setChatMessages(prev => [...prev, aiMsg]);
+              if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
+            }
+            // Hard guardrail: saves never trigger new name generation
+          } catch {} finally { setChatLoading(false); }
+        })();
+      }
     }
   }, [tld, callChatApi, generateBatch]);
 
@@ -788,6 +812,10 @@ export default function ResultsPage() {
       <div className="flex">
         <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
           <div className="max-w-6xl mx-auto">
+            {/* Model selector bar */}
+            <div className="flex items-center justify-between mb-4">
+              <ModelSelector selectedModel={selectedModel} onSelect={setSelectedModel} availableModels={features.availableModels} />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {gridItems.map((item) => {
                 if (item.type === 'divider') return (
@@ -827,9 +855,9 @@ export default function ResultsPage() {
             <div className="sm:hidden h-16" />
           </div>
         </main>
-        <ChatSidebar messages={chatMessages} onSend={handleChatSend} onAcceptChange={handleAcceptChange} onRejectChange={handleRejectChange} isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} />
+        <ChatSidebar messages={chatMessages} onSend={handleChatSend} onAcceptChange={handleAcceptChange} onRejectChange={handleRejectChange} isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} chatEnabled={features.aiChat} />
       </div>
-      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} chatOpen={chatOpen} />}
+      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} chatOpen={chatOpen} advancedAvailability={features.advancedAvailability} extraVariants={features.extraVariants} />}
     </div>
   );
 }

@@ -5,11 +5,13 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { config, existingNames = [], savedNames = [], batchSize = 10, nonce = '', chatHistory = [] } = body;
+    const { config, existingNames = [], savedNames = [], batchSize = 10, nonce = '', chatHistory = [], model: requestedModel } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
     if (!apiKey) return NextResponse.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
+
+    // Use client-requested model, fall back to env var, then default
+    const model = requestedModel || process.env.AI_MODEL || 'google/gemini-3-flash-preview';
 
     const seed = nonce || Math.random().toString(36).slice(2, 10);
     const tld = config.tld || 'com';

@@ -28,9 +28,10 @@ interface ChatSidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   unreadCount: number;
+  chatEnabled: boolean;
 }
 
-export default function ChatSidebar({ messages, onSend, onAcceptChange, onRejectChange, isLoading, isOpen, onToggle, unreadCount }: ChatSidebarProps) {
+export default function ChatSidebar({ messages, onSend, onAcceptChange, onRejectChange, isLoading, isOpen, onToggle, unreadCount, chatEnabled }: ChatSidebarProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -142,7 +143,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
   );
 
   // Shared input bar JSX
-  const inputBar = (
+  const inputBar = chatEnabled ? (
     <div className="shrink-0 border-t border-[var(--border)] p-3">
       <div className="flex gap-2">
         <textarea
@@ -160,6 +161,15 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
         </button>
       </div>
+    </div>
+  ) : (
+    <div className="shrink-0 border-t border-[var(--border)] p-3">
+      <a href="/pricing" className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[var(--accent)]/[0.06] border border-[var(--accent)]/10 hover:bg-[var(--accent)]/10 transition-colors">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.6">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <span className="text-xs text-[var(--accent)]/70">Upgrade to Pro to chat with the AI</span>
+      </a>
     </div>
   );
 
