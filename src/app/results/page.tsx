@@ -319,7 +319,7 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
         {/* TLD exploration */}
         <div>
           <h3 className="text-xs font-medium text-white/50 uppercase tracking-wider mb-2">{card.name.toLowerCase()}.___</h3>
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto px-1 -mx-1">
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto overflow-x-hidden">
             {card.tldChecks.map(tc => <DomainRow key={tc.domain} domain={tc.domain} tld="" available={tc.available} method={tc.method} />)}
           </div>
           {/* Add more TLDs */}
@@ -350,7 +350,7 @@ function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVarian
               </select>
             </div>
           </div>
-          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto px-1 -mx-1">
+          <div className="flex flex-col gap-1 max-h-64 overflow-y-auto overflow-x-hidden">
             <DomainRow domain={card.exactDomain.domain} tld={variantTld} available={card.exactDomain.available} method={card.exactDomain.method} />
             {card.variantDomains.map(v => <DomainRow key={v.domain} domain={v.domain} tld={variantTld} available={v.available} method={v.method} />)}
           </div>
@@ -448,6 +448,7 @@ export default function ResultsPage() {
   const batchNumberRef = useRef(1);
   const usedGrad = useRef<Set<number>>(new Set());
   const cardsLenRef = useRef(0);
+  const savedNamesRef = useRef<Set<string>>(new Set());
   const lastCheckInRef = useRef(0);
 
   // Chat state
@@ -461,6 +462,7 @@ export default function ResultsPage() {
   useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setUnreadCount(0); }, [chatOpen]);
   useEffect(() => { chatMessagesRef.current = chatMessages; }, [chatMessages]);
   useEffect(() => { cardsLenRef.current = cards.length; }, [cards.length]);
+  useEffect(() => { savedNamesRef.current = savedNames; }, [savedNames]);
 
   // Persist state to sessionStorage so navigating to settings and back preserves everything
   useEffect(() => {
@@ -540,7 +542,7 @@ export default function ResultsPage() {
     try {
       const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          config: configRef.current, existingNames: existingNamesRef.current, savedNames: Array.from(savedNames), batchSize: 10,
+          config: configRef.current, existingNames: existingNamesRef.current, savedNames: Array.from(savedNamesRef.current), batchSize: 10,
           nonce: Math.random().toString(36).slice(2, 10),
           model: selectedModelRef.current,
           chatHistory: chatMessagesRef.current.slice(-20).map(m => ({ role: m.role, content: m.content })),
@@ -570,7 +572,7 @@ export default function ResultsPage() {
       const totalShown = existingNamesRef.current.length;
       const lastCheckIn = lastCheckInRef.current;
       const userMsgCount = chatMessagesRef.current.filter(m => m.role === 'user').length;
-      const savedCount = savedNames.size;
+      const savedCount = savedNamesRef.current.size;
       // Trigger every 30 names, but only if user hasn't chatted recently and has saved fewer than expected
       if (totalShown - lastCheckIn >= 30 && !dividerText && features.aiChat) {
         lastCheckInRef.current = totalShown;
@@ -585,7 +587,7 @@ export default function ResultsPage() {
             const allMsgs = [...chatMessagesRef.current, checkInEvent].map(m => ({ role: m.role, content: m.content }));
             const r = await fetch('/api/chat', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ messages: allMsgs, config: configRef.current, savedNames: Array.from(savedNames), namesShown: totalShown }),
+              body: JSON.stringify({ messages: allMsgs, config: configRef.current, savedNames: Array.from(savedNamesRef.current), namesShown: totalShown }),
             });
             if (r.ok) {
               const { message } = await r.json();
@@ -810,24 +812,26 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen">
       <Header onRefresh={handleRefresh} />
+      {/* Sticky model bar */}
+      <div className={`sticky top-14 z-40 backdrop-blur-xl bg-[#0a0a0f]/80 border-b border-[var(--border)] transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
+        <div className="max-w-6xl mx-auto px-4 h-9 flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
+            <span>{AI_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown model'}</span>
+            <span className="text-[var(--text-secondary)]/40">·</span>
+            <span className="text-[var(--text-secondary)]/40">{AI_MODELS.find(m => m.id === selectedModel)?.provider}</span>
+          </div>
+          <button
+            onClick={() => router.push('/configure')}
+            className="text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors underline underline-offset-2 decoration-[var(--accent)]/20 hover:decoration-[var(--accent)]/50"
+          >
+            change
+          </button>
+        </div>
+      </div>
       <div className="flex">
         <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
           <div className="max-w-6xl mx-auto">
-            {/* Current model indicator */}
-            <div className="flex items-center gap-3 mb-4 text-xs text-[var(--text-secondary)]">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-                <span>{AI_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown model'}</span>
-                <span className="text-[var(--text-secondary)]/40">·</span>
-                <span className="text-[var(--text-secondary)]/40">{AI_MODELS.find(m => m.id === selectedModel)?.provider}</span>
-              </div>
-              <button
-                onClick={() => router.push('/configure')}
-                className="text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors underline underline-offset-2 decoration-[var(--accent)]/20 hover:decoration-[var(--accent)]/50"
-              >
-                change model
-              </button>
-            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {gridItems.map((item) => {
                 if (item.type === 'divider') return (

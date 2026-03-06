@@ -39,8 +39,8 @@ html, body {
   box-shadow: 0 20px 40px rgba(0,0,0,0.4);
 }
 
-.domain-pill { transition: all 0.2s ease; cursor: pointer; position: relative; z-index: 1; }
-.domain-pill:hover { filter: brightness(1.2); transform: scale(1.02); z-index: 2; }
+.domain-pill { transition: all 0.2s ease; cursor: pointer; }
+.domain-pill:hover { filter: brightness(1.2); box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 2px 8px rgba(0,0,0,0.3); }
 
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(24px) scale(0.96); }
