@@ -167,10 +167,6 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, cha
       exactDomain: results[c.exactDomain.domain] ? { ...c.exactDomain, available: results[c.exactDomain.domain].available, method: results[c.exactDomain.domain].method } : c.exactDomain,
       variantDomains: c.variantDomains.map(v => results[v.domain] ? { ...v, available: results[v.domain].available, method: results[v.domain].method } : v),
     }));
-    if (results[card.exactDomain.domain]?.available) {
-      const xr = await cachedWhoisCheck([card.exactDomain.domain], newTld);
-      onUpdate(c => ({ ...c, exactDomain: xr[c.exactDomain.domain] ? { ...c.exactDomain, available: xr[c.exactDomain.domain].available, method: 'whoisxml' as CM } : c.exactDomain }));
-    }
     setRecheckingTld(false);
   };
 
@@ -463,10 +459,6 @@ export default function ResultsPage() {
       exactDomain: dns[c.exactDomain.domain] ? { ...c.exactDomain, available: dns[c.exactDomain.domain].available, method: dns[c.exactDomain.domain].method } : c.exactDomain,
       variantDomains: c.variantDomains.map(v => dns[v.domain] ? { ...v, available: dns[v.domain].available, method: dns[v.domain].method } : v),
     }));
-    if (dns[exactDomain]?.available) {
-      const xml = await cachedWhoisCheck([exactDomain], ct);
-      setCards(prev => prev.map(c => c.id !== cardId ? c : { ...c, exactDomain: xml[c.exactDomain.domain] ? { ...c.exactDomain, available: xml[c.exactDomain.domain].available, method: 'whoisxml' as CM } : c.exactDomain }));
-    }
   }, []);
 
   const generateBatch = useCallback(async (dividerText?: string) => {
