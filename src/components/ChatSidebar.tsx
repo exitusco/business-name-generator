@@ -2,31 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-// Typewriter effect for new AI messages
-function TypewriterText({ text, onComplete }: { text: string; onComplete?: () => void }) {
-  const [displayed, setDisplayed] = useState('');
-  const indexRef = useRef(0);
-
-  useEffect(() => {
-    if (!text) return;
-    indexRef.current = 0;
-    setDisplayed('');
-    const interval = setInterval(() => {
-      indexRef.current++;
-      if (indexRef.current >= text.length) {
-        setDisplayed(text);
-        clearInterval(interval);
-        onComplete?.();
-      } else {
-        setDisplayed(text.slice(0, indexRef.current));
-      }
-    }, 18); // ~55 chars/second
-    return () => clearInterval(interval);
-  }, [text, onComplete]);
-
-  return <>{displayed}<span className="inline-block w-[2px] h-[14px] bg-[var(--text-secondary)]/50 ml-0.5 align-middle" style={{ animation: displayed.length < text.length ? 'pulse 0.8s ease-in-out infinite' : 'none', opacity: displayed.length < text.length ? 1 : 0 }} /></>;
-}
-
 export interface SuggestedChangeUI {
   field: string;
   label: string;
@@ -59,7 +34,6 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const animatedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -106,16 +80,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
               <div className="max-w-[90%] space-y-2">
                 {msg.content && (
                   <div className="border-l-2 border-[var(--border)] pl-3 py-1">
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      {animatedIds.current.has(msg.id)
-                        ? msg.content
-                        : (() => { animatedIds.current.add(msg.id); return null; })() || (
-                          <TypewriterText text={msg.content} onComplete={() => {
-                            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                          }} />
-                        )
-                      }
-                    </p>
+                    <p className="text-sm text-[var(--text-secondary)]">{msg.content}</p>
                   </div>
                 )}
                 {/* Config change proposals */}

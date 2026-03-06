@@ -426,6 +426,7 @@ export default function ResultsPage() {
   const batchNumberRef = useRef(1);
   const usedGrad = useRef<Set<number>>(new Set());
   const cardsLenRef = useRef(0);
+  const lastCheckInRef = useRef(0);
 
   // Chat state
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -540,6 +541,40 @@ export default function ResultsPage() {
           const el = document.getElementById(`divider-${dividerIndex}`);
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 200);
+      }
+
+      // Proactive check-in: if user has seen many names without interacting, ask a question
+      const totalShown = existingNamesRef.current.length;
+      const lastCheckIn = lastCheckInRef.current;
+      const userMsgCount = chatMessagesRef.current.filter(m => m.role === 'user').length;
+      const savedCount = savedNames.size;
+      // Trigger every 30 names, but only if user hasn't chatted recently and has saved fewer than expected
+      if (totalShown - lastCheckIn >= 30 && !dividerText) {
+        lastCheckInRef.current = totalShown;
+        // Fire async — don't block
+        (async () => {
+          try {
+            const checkInEvent: ChatMsg = {
+              id: `event-checkin-${Date.now()}`, role: 'system-event',
+              content: `User has browsed ${totalShown} names, saved ${savedCount}, sent ${userMsgCount} messages`,
+              timestamp: Date.now(),
+            };
+            const allMsgs = [...chatMessagesRef.current, checkInEvent].map(m => ({ role: m.role, content: m.content }));
+            const r = await fetch('/api/chat', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ messages: allMsgs, config: configRef.current, savedNames: Array.from(savedNames), namesShown: totalShown }),
+            });
+            if (r.ok) {
+              const { message } = await r.json();
+              if (message) {
+                setChatMessages(prev => [...prev, checkInEvent]);
+                const aiMsg: ChatMsg = { id: `ai-checkin-${Date.now()}`, role: 'assistant', content: message, timestamp: Date.now() };
+                setChatMessages(prev => [...prev, aiMsg]);
+                if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
+              }
+            }
+          } catch {}
+        })();
       }
     } catch (err: any) { setError(err.message || 'Failed'); } finally { setIsGenerating(false); loadingRef.current = false; }
   }, [checkDomainsForCard]);
@@ -735,6 +770,7 @@ export default function ResultsPage() {
     batchNumberRef.current = 1;
     loadingRef.current = false;
     usedGrad.current.clear();
+    lastCheckInRef.current = 0;
     try {
       sessionStorage.removeItem('nc_cards');
       sessionStorage.removeItem('nc_dividers');
