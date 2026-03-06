@@ -130,10 +130,10 @@ export default function ChatSidebar({ messages, onSend, isLoading, isOpen, onTog
 // --- Shared sub-components ---
 
 function MessageList({ messages, scrollRef, isLoading }: {
-  messages: ChatMsg[]; scrollRef: React.RefObject<HTMLDivElement | null>; isLoading: boolean;
+  messages: ChatMsg[]; scrollRef: React.RefObject<HTMLDivElement>; isLoading: boolean;
 }) {
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+    <div ref={scrollRef as React.LegacyRef<HTMLDivElement>} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
       {messages.length === 0 && (
         <div className="text-center py-8">
           <p className="text-xs text-[var(--text-secondary)]/60">Chat with your naming assistant...</p>
@@ -181,7 +181,7 @@ function MessageList({ messages, scrollRef, isLoading }: {
 function InputBar({ input, setInput, onSubmit, onKeyDown, isLoading, inputRef }: {
   input: string; setInput: (v: string) => void; onSubmit: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void; isLoading: boolean;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   return (
     <div className="shrink-0 border-t border-[var(--border)] p-3">
