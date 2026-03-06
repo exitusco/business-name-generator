@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
+import ChatSidebar from '@/components/ChatSidebar';
+import type { ChatMsg } from '@/components/ChatSidebar';
 import { NameCardData, DomainCheck, SavedName, CARD_FONTS, GRADIENTS, CATEGORY_COLORS, COMMON_TLDS } from '@/lib/types';
 import { pickTextColor, STATUS_COLORS as SC } from '@/lib/colors';
 import { partitionCached, setCache } from '@/lib/domain-cache';
@@ -409,9 +411,11 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
   );
 }
 
+
 // ===== MAIN =====
 export default function ResultsPage() {
   const [cards, setCards] = useState<CardData[]>([]);
+  const [dividers, setDividers] = useState<Record<number, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedNames, setSavedNames] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -425,12 +429,27 @@ export default function ResultsPage() {
   const initialLoadDone = useRef(false);
   const batchNumberRef = useRef(1);
   const usedGrad = useRef<Set<number>>(new Set());
+  const cardsLenRef = useRef(0);
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [chatOpen, setChatOpen] = useState(true);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const conversationContextRef = useRef('');
+  const chatOpenRef = useRef(true);
+  const chatMessagesRef = useRef<ChatMsg[]>([]);
+
+  useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setUnreadCount(0); }, [chatOpen]);
+  useEffect(() => { chatMessagesRef.current = chatMessages; }, [chatMessages]);
+  useEffect(() => { cardsLenRef.current = cards.length; }, [cards.length]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try { const s = localStorage.getItem('nc_saved'); if (s) setSavedNames(new Set(JSON.parse(s).map((x: SavedName) => x.name))); } catch {}
       try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); } } catch {}
       if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
+      if (window.innerWidth < 640) setChatOpen(false);
     }
   }, []);
 
@@ -451,17 +470,22 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const generateBatch = useCallback(async () => {
+  const generateBatch = useCallback(async (context?: string, dividerText?: string) => {
     if (loadingRef.current) return;
     if (!configRef.current) {
-      // Try to load config if it wasn't ready
       try { const c = localStorage.getItem('nc_config'); if (c) configRef.current = JSON.parse(c); } catch {}
       if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
     }
     loadingRef.current = true; setIsGenerating(true); setError(null);
+    const dividerIndex = cardsLenRef.current;
+
     try {
       const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: configRef.current, existingNames: existingNamesRef.current, rejectedNames: existingNamesRef.current, batchSize: 10, batchNumber: batchNumberRef.current, nonce: Math.random().toString(36).slice(2, 10) }) });
+        body: JSON.stringify({
+          config: configRef.current, existingNames: existingNamesRef.current, batchSize: 10,
+          nonce: Math.random().toString(36).slice(2, 10),
+          conversationContext: context || conversationContextRef.current || '',
+        }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Failed'); }
       const { suggestions } = await r.json();
       const ct = configRef.current?.tld || 'com';
@@ -473,8 +497,15 @@ export default function ResultsPage() {
           tldChecks: [], verified: false, verifying: false, loadingVariants: false, variantTld: ct, ...st };
       });
       for (const c of nc) existingNamesRef.current.push(c.name.toLowerCase());
+      if (dividerText) setDividers(prev => ({ ...prev, [dividerIndex]: dividerText }));
       setCards(prev => [...prev, ...nc]); batchNumberRef.current++;
       for (const c of nc) checkDomainsForCard(c.id, c.exactDomain.domain, c.variantDomains.map(v => v.domain));
+      if (dividerText) {
+        setTimeout(() => {
+          const el = document.getElementById(`divider-${dividerIndex}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      }
     } catch (err: any) { setError(err.message || 'Failed'); } finally { setIsGenerating(false); loadingRef.current = false; }
   }, [checkDomainsForCard]);
 
@@ -489,11 +520,41 @@ export default function ResultsPage() {
     return () => observerRef.current?.disconnect();
   }, [generateBatch]);
 
-  const handleSave = (card: CardData) => {
+  // --- Chat ---
+  const callChatApi = useCallback(async (messages: ChatMsg[], extraSavedNames?: string[]) => {
+    const allMsgs = messages.map(m => ({ role: m.role, content: m.content }));
+    const savedArr = [...Array.from(savedNames), ...(extraSavedNames || [])];
+    const r = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: allMsgs, config: configRef.current, savedNames: savedArr, namesShown: existingNamesRef.current.length }),
+    });
+    if (!r.ok) throw new Error('Chat failed');
+    return r.json();
+  }, [savedNames]);
+
+  const handleChatSend = useCallback(async (text: string) => {
+    const userMsg: ChatMsg = { id: `user-${Date.now()}`, role: 'user', content: text, timestamp: Date.now() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatLoading(true);
+    try {
+      const { message, generateNames, namingGuidance } = await callChatApi([...chatMessagesRef.current, userMsg]);
+      if (message) {
+        const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, role: 'assistant', content: message, timestamp: Date.now() };
+        setChatMessages(prev => [...prev, aiMsg]);
+        if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
+      }
+      if (namingGuidance) conversationContextRef.current = namingGuidance;
+      if (generateNames) generateBatch(namingGuidance || conversationContextRef.current, message || 'New direction based on your feedback');
+    } catch (err) { console.error('Chat error:', err); } finally { setChatLoading(false); }
+  }, [callChatApi, generateBatch]);
+
+  const handleSave = useCallback((card: CardData) => {
     if (typeof window === 'undefined') return;
     const saved: SavedName[] = JSON.parse(localStorage.getItem('nc_saved') || '[]');
     const vt = card.variantTld || tld;
-    if (saved.some(s => s.name === card.name)) {
+    const isUnsaving = saved.some(s => s.name === card.name);
+
+    if (isUnsaving) {
       localStorage.setItem('nc_saved', JSON.stringify(saved.filter(s => s.name !== card.name)));
       setSavedNames(prev => { const n = new Set(prev); n.delete(card.name); return n; });
     } else {
@@ -503,46 +564,81 @@ export default function ResultsPage() {
       saved.push({ name: card.name, category: card.category, savedAt: Date.now(), gradient: card.gradient, fontFamily: card.fontFamily, textColor: card.textColor, availableDomains: avD });
       localStorage.setItem('nc_saved', JSON.stringify(saved));
       setSavedNames(prev => { const a = Array.from(prev); a.push(card.name); return new Set(a); });
+
+      // Chat: system event + AI reaction
+      const eventMsg: ChatMsg = { id: `event-${Date.now()}`, role: 'system-event', content: `Saved "${card.name}"`, timestamp: Date.now() };
+      setChatMessages(prev => [...prev, eventMsg]);
+
+      (async () => {
+        setChatLoading(true);
+        try {
+          const { message, generateNames, namingGuidance } = await callChatApi([...chatMessagesRef.current, eventMsg], [card.name]);
+          if (message) {
+            const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, role: 'assistant', content: message, timestamp: Date.now() };
+            setChatMessages(prev => [...prev, aiMsg]);
+            if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
+          }
+          if (namingGuidance) conversationContextRef.current = namingGuidance;
+          if (generateNames) generateBatch(namingGuidance || conversationContextRef.current, message || `Inspired by "${card.name}"`);
+        } catch {} finally { setChatLoading(false); }
+      })();
     }
-  };
+  }, [tld, callChatApi, generateBatch]);
 
   const activeCard = activeCardId ? cards.find(c => c.id === activeCardId) : null;
   const updateCard = useCallback((id: string) => (fn: (c: CardData) => CardData) => { setCards(prev => prev.map(c => c.id === id ? fn(c) : c)); }, []);
 
+  // Build grid with dividers
+  const gridItems: Array<{ type: 'card'; card: CardData; index: number } | { type: 'divider'; text: string; id: number }> = [];
+  cards.forEach((c, i) => {
+    if (dividers[i]) gridItems.push({ type: 'divider', text: dividers[i], id: i });
+    gridItems.push({ type: 'card', card: c, index: i });
+  });
+
   return (
     <div className="min-h-screen">
       <Header />
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cards.map((c, i) => <GridCard key={c.id} card={c} index={i % 10} onSave={handleSave} onExplore={() => setActiveCardId(c.id)} isSaved={savedNames.has(c.name)} tld={tld} />)}
-          {/* Skeleton cards that fill the partial row + next full row */}
-          {isGenerating && (() => {
-            const cols = 3; // max columns at lg
-            const remainder = cards.length % cols;
-            const fillCount = remainder === 0 ? cols : (cols - remainder) + cols;
-            return [...Array(Math.min(fillCount, 9))].map((_, i) => (
-              <div key={`skel-${i}`} className="rounded-2xl overflow-hidden border-2 border-[var(--border)]">
-                <div className="h-40 sm:h-48 bg-[var(--bg-elevated)] pulse" />
-                <div className="bg-[var(--bg-secondary)] px-4 py-3 space-y-2">
-                  <div className="h-3 bg-white/[0.05] rounded w-3/4 pulse" />
-                  <div className="h-3 bg-white/[0.05] rounded w-1/2 pulse" />
-                </div>
+      <div className="flex">
+        <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {gridItems.map((item) => {
+                if (item.type === 'divider') return (
+                  <div key={`div-${item.id}`} id={`divider-${item.id}`} className="col-span-full flex items-center gap-4 py-4">
+                    <div className="h-px flex-1 bg-[var(--accent)]/20" />
+                    <span className="text-xs text-[var(--accent)]/70 shrink-0 max-w-md text-center italic">{item.text}</span>
+                    <div className="h-px flex-1 bg-[var(--accent)]/20" />
+                  </div>
+                );
+                return <GridCard key={item.card.id} card={item.card} index={item.index % 10} onSave={handleSave} onExplore={() => setActiveCardId(item.card.id)} isSaved={savedNames.has(item.card.name)} tld={tld} />;
+              })}
+              {isGenerating && (() => {
+                const cols = 3;
+                const remainder = cards.length % cols;
+                const fillCount = remainder === 0 ? cols : (cols - remainder) + cols;
+                return [...Array(Math.min(fillCount, 9))].map((_, i) => (
+                  <div key={`skel-${i}`} className="rounded-2xl overflow-hidden border-2 border-[var(--border)]">
+                    <div className="h-40 sm:h-48 bg-[var(--bg-elevated)] pulse" />
+                    <div className="bg-[var(--bg-secondary)] px-4 py-3 space-y-2">
+                      <div className="h-3 bg-white/[0.05] rounded w-3/4 pulse" />
+                      <div className="h-3 bg-white/[0.05] rounded w-1/2 pulse" />
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            {error && <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center"><p className="text-red-400 text-sm mb-2">{error}</p><button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">Try again</button></div>}
+            {!isGenerating && cards.length > 0 && (
+              <div className="flex justify-center py-8">
+                <button onClick={() => generateBatch()} className="px-6 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent-dim)] transition-all">Load more names</button>
               </div>
-            ));
-          })()}
-        </div>
-        {error && <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center"><p className="text-red-400 text-sm mb-2">{error}</p><button onClick={() => generateBatch()} className="text-sm text-[var(--accent)] hover:underline">Try again</button></div>}
-        {/* Manual load more button as fallback for when observer doesn't trigger */}
-        {!isGenerating && cards.length > 0 && (
-          <div className="flex justify-center py-8">
-            <button onClick={() => generateBatch()}
-              className="px-6 py-2.5 rounded-xl text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] hover:border-[var(--accent-dim)] transition-all">
-              Load more names
-            </button>
+            )}
+            <div ref={sentinelRef} className="h-20" />
+            <div className="sm:hidden h-16" />
           </div>
-        )}
-        <div ref={sentinelRef} className="h-20" />
-      </main>
+        </main>
+        <ChatSidebar messages={chatMessages} onSend={handleChatSend} isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} />
+      </div>
       {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} />}
     </div>
   );
