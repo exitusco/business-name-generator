@@ -71,7 +71,7 @@ export async function getUsage(
 export async function ensureUserMeta(
   userId: string | null,
   anonymousId: string | null
-) {
+): Promise<{ period_start: string; period_end: string; selected_model: string | null; [key: string]: any } | null> {
   const supabase = getSupabase();
 
   // Try to find existing
@@ -85,7 +85,7 @@ export async function ensureUserMeta(
   }
 
   const { data: existing } = await query.maybeSingle();
-  if (existing) return existing;
+  if (existing) return existing as any;
 
   // Create new
   const now = new Date().toISOString();
@@ -105,5 +105,5 @@ export async function ensureUserMeta(
   }).select().single();
 
   if (error) console.error('Failed to create user_meta:', error);
-  return created;
+  return created as any;
 }
