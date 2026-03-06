@@ -669,10 +669,13 @@ export default function ResultsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {gridItems.map((item) => {
                 if (item.type === 'divider') return (
-                  <div key={`div-${item.id}`} id={`divider-${item.id}`} className="col-span-full flex items-center gap-4 py-4">
-                    <div className="h-px flex-1 bg-[var(--accent)]/20" />
-                    <span className="text-xs text-[var(--accent)]/70 shrink-0 max-w-md text-center italic">{item.text}</span>
-                    <div className="h-px flex-1 bg-[var(--accent)]/20" />
+                  <div key={`div-${item.id}`} id={`divider-${item.id}`} className="col-span-full py-6">
+                    <div className="relative flex items-center justify-center">
+                      <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-gradient-to-r from-transparent via-[var(--accent)]/20 to-transparent" /></div>
+                      <div className="relative px-5 py-2 rounded-full bg-[var(--bg-primary)] border border-[var(--accent)]/15">
+                        <span className="text-[11px] text-[var(--accent)]/80 tracking-wide">{item.text}</span>
+                      </div>
+                    </div>
                   </div>
                 );
                 return <GridCard key={item.card.id} card={item.card} index={item.index % 10} onSave={handleSave} onExplore={() => setActiveCardId(item.card.id)} isSaved={savedNames.has(item.card.name)} tld={tld} />;

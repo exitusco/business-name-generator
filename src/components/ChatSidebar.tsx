@@ -62,54 +62,59 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
       {messages.map((msg) => (
         <div key={msg.id}>
           {msg.role === 'system-event' ? (
-            <div className="flex items-center gap-2 py-1">
+            <div className="flex items-center gap-2 py-1.5">
               <div className="h-px flex-1 bg-[var(--border)]" />
-              <span className="text-[10px] text-[var(--text-secondary)]/50 shrink-0">{msg.content}</span>
+              <span className="text-[10px] text-[var(--text-secondary)]/40 shrink-0 uppercase tracking-wider">{msg.content}</span>
               <div className="h-px flex-1 bg-[var(--border)]" />
             </div>
           ) : msg.role === 'user' ? (
+            /* User messages: right-aligned, subtle accent left border, no bubble background */
             <div className="flex justify-end">
-              <div className="max-w-[85%] bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-2xl rounded-br-md px-3 py-2">
+              <div className="max-w-[85%] border-r-2 border-[var(--accent)]/40 pr-3 py-1">
                 <p className="text-sm text-[var(--text-primary)]">{msg.content}</p>
               </div>
             </div>
           ) : (
+            /* AI messages: left-aligned, muted, editorial feel */
             <div className="flex justify-start">
               <div className="max-w-[90%] space-y-2">
                 {msg.content && (
-                  <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl rounded-bl-md px-3 py-2">
-                    <p className="text-sm text-[var(--text-primary)]">{msg.content}</p>
+                  <div className="border-l-2 border-[var(--border)] pl-3 py-1">
+                    <p className="text-sm text-[var(--text-secondary)]">{msg.content}</p>
                   </div>
                 )}
+                {/* Config change proposals */}
                 {msg.suggestedChanges && msg.suggestedChanges.length > 0 && (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 pl-3">
                     {msg.suggestedChanges.map((sc, idx) => (
-                      <div key={idx} className={`rounded-xl border px-3 py-2 text-xs ${
-                        sc.status === 'accepted' ? 'bg-[#22c55e]/8 border-[#22c55e]/20' :
-                        sc.status === 'rejected' ? 'bg-white/[0.02] border-[var(--border)] opacity-50' :
-                        'bg-[var(--accent)]/5 border-[var(--accent)]/20'
+                      <div key={idx} className={`rounded-lg px-3 py-2.5 text-xs transition-all ${
+                        sc.status === 'accepted'
+                          ? 'bg-[#22c55e]/[0.06] border border-[#22c55e]/15'
+                          : sc.status === 'rejected'
+                          ? 'opacity-40 border border-[var(--border)]'
+                          : 'bg-[var(--bg-elevated)] border border-[var(--border)]'
                       }`}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0">
+                        <div className="flex flex-col gap-2">
+                          <div>
                             <span className="text-[var(--text-secondary)]">{sc.action === 'append' ? 'Add to' : 'Update'} </span>
                             <span className="text-[var(--text-primary)] font-medium">{sc.label}</span>
                             <span className="text-[var(--text-secondary)]"> → </span>
                             <span className="text-[var(--accent)]">{sc.displayValue}</span>
                           </div>
                           {sc.status === 'pending' ? (
-                            <div className="flex gap-1.5 shrink-0">
+                            <div className="flex gap-2">
                               <button onClick={() => onAcceptChange(msg.id, idx)}
-                                className="px-2.5 py-1 rounded-lg bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20 transition-colors font-medium">
+                                className="flex-1 py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-colors border border-[var(--accent)]/15">
                                 Accept
                               </button>
                               <button onClick={() => onRejectChange(msg.id, idx)}
-                                className="px-2.5 py-1 rounded-lg bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 transition-colors">
-                                Reject
+                                className="flex-1 py-1.5 rounded-md text-[11px] bg-white/[0.03] text-[var(--text-secondary)] hover:bg-white/[0.06] transition-colors border border-[var(--border)]">
+                                Dismiss
                               </button>
                             </div>
                           ) : (
-                            <span className={`shrink-0 text-[10px] uppercase tracking-wider ${
-                              sc.status === 'accepted' ? 'text-[#22c55e]' : 'text-[var(--text-secondary)]/50'
+                            <span className={`text-[10px] uppercase tracking-wider ${
+                              sc.status === 'accepted' ? 'text-[#22c55e]/70' : 'text-[var(--text-secondary)]/40'
                             }`}>
                               {sc.status === 'accepted' ? '✓ Applied' : 'Dismissed'}
                             </span>
@@ -125,13 +130,11 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
         </div>
       ))}
       {isLoading && (
-        <div className="flex justify-start">
-          <div className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl rounded-bl-md px-3 py-2">
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 bg-white/30 rounded-full pulse" style={{ animationDelay: '0ms' }} />
-              <span className="w-1.5 h-1.5 bg-white/30 rounded-full pulse" style={{ animationDelay: '200ms' }} />
-              <span className="w-1.5 h-1.5 bg-white/30 rounded-full pulse" style={{ animationDelay: '400ms' }} />
-            </div>
+        <div className="flex justify-start pl-3 border-l-2 border-[var(--border)]">
+          <div className="flex gap-1.5 py-2">
+            <span className="w-1.5 h-1.5 bg-[var(--text-secondary)]/30 rounded-full pulse" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 bg-[var(--text-secondary)]/30 rounded-full pulse" style={{ animationDelay: '200ms' }} />
+            <span className="w-1.5 h-1.5 bg-[var(--text-secondary)]/30 rounded-full pulse" style={{ animationDelay: '400ms' }} />
           </div>
         </div>
       )}
