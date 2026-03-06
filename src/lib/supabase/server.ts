@@ -1,10 +1,72 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Server-side Supabase client using secret key (replaces service_role)
-// Only use this in API routes / server-side code — never expose to client
-let supabase: ReturnType<typeof createClient> | null = null;
+// Minimal database type definitions so TypeScript doesn't infer 'never'
+interface Database {
+  public: {
+    Tables: {
+      usage_events: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          anonymous_id: string | null;
+          metric: string;
+          count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          anonymous_id?: string | null;
+          metric: string;
+          count?: number;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string | null;
+          anonymous_id?: string | null;
+          metric?: string;
+          count?: number;
+        };
+      };
+      user_meta: {
+        Row: {
+          id: string;
+          clerk_user_id: string | null;
+          anonymous_id: string | null;
+          first_seen_at: string;
+          period_start: string;
+          period_end: string;
+          selected_model: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          clerk_user_id?: string | null;
+          anonymous_id?: string | null;
+          first_seen_at?: string;
+          period_start?: string;
+          period_end?: string;
+          selected_model?: string | null;
+        };
+        Update: {
+          clerk_user_id?: string | null;
+          anonymous_id?: string | null;
+          period_start?: string;
+          period_end?: string;
+          selected_model?: string | null;
+        };
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+  };
+}
 
-export function getSupabase() {
+let supabase: SupabaseClient<Database> | null = null;
+
+export function getSupabase(): SupabaseClient<Database> {
   if (supabase) return supabase;
 
   const url = process.env.SUPABASE_URL;
@@ -14,7 +76,7 @@ export function getSupabase() {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SECRET_KEY environment variables');
   }
 
-  supabase = createClient(url, key, {
+  supabase = createClient<Database>(url, key, {
     auth: { persistSession: false },
   });
 

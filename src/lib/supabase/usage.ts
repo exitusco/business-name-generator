@@ -15,7 +15,7 @@ export async function trackUsage(
   const identifier = userId || anonymousId;
   if (!identifier) return;
 
-  const { error } = await supabase.from('usage_events' as any).insert({
+  const { error } = await supabase.from('usage_events').insert({
     user_id: userId,
     anonymous_id: anonymousId,
     metric,
@@ -71,32 +71,30 @@ export async function getUsage(
 export async function ensureUserMeta(
   userId: string | null,
   anonymousId: string | null
-): Promise<{ period_start: string; period_end: string; selected_model: string | null; [key: string]: any } | null> {
+) {
   const supabase = getSupabase();
 
   // Try to find existing
-  let query = supabase.from('user_meta' as any).select('*');
   if (userId) {
-    query = query.eq('clerk_user_id', userId);
+    const { data } = await supabase.from('user_meta').select('*').eq('clerk_user_id', userId).maybeSingle();
+    if (data) return data;
   } else if (anonymousId) {
-    query = query.eq('anonymous_id', anonymousId);
+    const { data } = await supabase.from('user_meta').select('*').eq('anonymous_id', anonymousId).maybeSingle();
+    if (data) return data;
   } else {
     return null;
   }
 
-  const { data: existing } = await query.maybeSingle();
-  if (existing) return existing as any;
-
   // Create new
   const now = new Date().toISOString();
   const periodStart = new Date();
-  periodStart.setDate(1); // first of current month
+  periodStart.setDate(1);
   periodStart.setHours(0, 0, 0, 0);
 
   const periodEnd = new Date(periodStart);
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-  const { data: created, error } = await supabase.from('user_meta' as any).insert({
+  const { data: created, error } = await supabase.from('user_meta').insert({
     clerk_user_id: userId,
     anonymous_id: anonymousId,
     first_seen_at: now,
@@ -105,5 +103,5 @@ export async function ensureUserMeta(
   }).select().single();
 
   if (error) console.error('Failed to create user_meta:', error);
-  return created as any;
+  return created;
 }
