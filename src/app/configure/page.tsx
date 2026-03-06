@@ -203,22 +203,6 @@ export default function ConfigurePage() {
             </div>
           </div>
 
-          {/* Domain modifiers */}
-          <div>
-            <label className="block text-sm font-medium mb-3 text-[var(--text-secondary)]">Domain modifiers acceptable?</label>
-            <p className="text-xs text-[var(--text-secondary)]/60 mb-3">Like join____.{tld}, get____.{tld}</p>
-            <div className="flex gap-3">
-              {['Yes', 'No', 'No preference'].map((opt) => (
-                <button key={opt} onClick={() => setDomainModifiers(opt.toLowerCase())}
-                  className={`px-4 py-2 rounded-lg text-sm transition-all border ${
-                    domainModifiers === opt.toLowerCase()
-                      ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-[var(--accent)]'
-                      : 'bg-[var(--bg-secondary)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--accent-dim)]'
-                  }`}>{opt}</button>
-              ))}
-            </div>
-          </div>
-
           {/* Competitors */}
           <div>
             <label className="block text-sm font-medium mb-2 text-[var(--text-secondary)]">Competitors whose name you like?</label>

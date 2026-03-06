@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'NameCraft — AI Domain Name Generator',
+  title: 'Poacher — AI Domain Name Generator',
   description: 'Find the perfect business name with AI-powered suggestions and real-time domain availability.',
 }
 

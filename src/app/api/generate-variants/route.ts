@@ -18,20 +18,27 @@ TLD: .${tld}
 
 Existing variants already shown (do NOT repeat): ${existingVariants.join(', ') || 'none'}
 
-Generate 4-8 NEW creative domain variants. These can be:
-- Prefix variants: get${name.toLowerCase()}, try${name.toLowerCase()}, etc.
-- Suffix variants: ${name.toLowerCase()}app, ${name.toLowerCase()}hq, etc.
+Generate 4-8 NEW domain variants. Be creative — these can be:
+- Prefix variants with BUSINESS-APPROPRIATE modifiers (NOT generic "use" or "get"):
+  Hiring/staffing: hire___, team___, ___crew, ___works
+  SaaS/software: try___, ___app, ___hq  
+  E-commerce: shop___, buy___, ___store
+  Agency/services: ___studio, ___labs, ___co
+  Food: eat___, order___, ___eats
+  Finance: ___pay, ___fi
+  Health: ___health, my___
+- Suffix variants: ${name.toLowerCase()}hq, ${name.toLowerCase()}app, etc.
 - Abbreviation variants: shortened/abbreviated versions
 - Creative respellings that keep the sound
 - The name combined with a relevant industry word
 
-CRITICAL READABILITY RULES:
-1. Every variant must read as clearly recognizable words when squished together. Read it aloud.
-2. No double-letter collisions at join points (e.g. get + talon = "gettalon" is bad)
-3. No variants that create unintended words across the join (e.g. "therapist" reading)
-4. Each must work as a .${tld} domain (no spaces, lowercase, alphanumeric only)
+READABILITY RULES:
+1. Every variant must read clearly as recognizable words when combined. Read it aloud.
+2. No double-letter collisions at join points
+3. No accidental words at the join
+4. Must work as a .${tld} domain (lowercase, alphanumeric only)
 
-Return ONLY a JSON array of strings (no .${tld} suffix). Example: ["getluminary","luminaryhq","trylumi"]`;
+Return ONLY a JSON array of strings (no .${tld} suffix). Example: ["hireluminary","luminaryhq","luminworks"]`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',

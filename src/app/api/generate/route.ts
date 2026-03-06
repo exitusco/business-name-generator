@@ -5,88 +5,92 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { config, existingNames = [], rejectedNames = [], batchSize = 10, batchNumber = 1, nonce = '' } = body;
+    const { config, existingNames = [], batchSize = 10, nonce = '' } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
     if (!apiKey) return NextResponse.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
 
-    // Random seed to ensure different outputs even with identical prompts
     const seed = nonce || Math.random().toString(36).slice(2, 10);
-
     const tld = config.tld || 'com';
 
-    const stylesList = [
-      ...(config.nameStyles || []),
-      ...(config.customStyles || []),
-    ];
+    const stylesList = [...(config.nameStyles || []), ...(config.customStyles || [])];
     const stylesStr = stylesList.length > 0 ? stylesList.join(', ') : 'any style';
 
-    // Obscurity: 0 = conventional, 50 = balanced, 100 = very obscure/invented
     const obscurity = config.obscurityLevel ?? 50;
     let obscurityDirective = '';
     if (obscurity < 25) {
-      obscurityDirective = 'Use familiar, recognizable words. Prioritize names that feel immediately understandable. Common dictionary words and well-known references are ideal.';
+      obscurityDirective = 'Lean toward familiar, recognizable words and references. The name should feel immediately understandable.';
     } else if (obscurity < 50) {
-      obscurityDirective = 'Mix familiar words with some creative twists. Slight modifications of real words or clever compounds are good.';
+      obscurityDirective = 'Balance familiarity with creativity. Clever twists on real words, unexpected combinations.';
     } else if (obscurity < 75) {
-      obscurityDirective = 'Lean toward unique and distinctive names. Invented words, unusual compounds, and creative coinages that are unlikely to be registered as domains.';
+      obscurityDirective = 'Favor distinctive, uncommon names. Coined words, rare references, creative portmanteaus.';
     } else {
-      obscurityDirective = 'Strongly favor invented, abstract, or highly unusual names. These should be completely unique strings that almost certainly have available .${tld} domains. Prioritize pronounceability but not familiarity.';
+      obscurityDirective = 'Strongly favor invented, never-before-seen names. Unique letter combinations that are pronounceable but not real words. These should almost certainly have available .${tld} domains.';
     }
 
-    let creativityDirective = '';
-    if (batchNumber <= 2) {
-      creativityDirective = 'Start with strong, intuitive names that clearly connect to the business.';
-    } else if (batchNumber <= 4) {
-      creativityDirective = 'The user has seen conventional options. Try unexpected metaphors, invented words, unusual pairings.';
-    } else if (batchNumber <= 7) {
-      creativityDirective = 'Be bold: abstract coinages, cultural references, synesthetic names, mythology, science.';
-    } else {
-      creativityDirective = 'Go WILD. Coin new words. Obscure languages, scientific terms, abstract concepts. Surprise the user.';
-    }
+    const prompt = `You are a world-class brand naming consultant — the kind who names companies like Spotify, Stripe, Figma, and Notion. Your job is to generate ${batchSize} exceptional business names.
 
-    const prompt = `You are a creative business naming expert. Generate exactly ${batchSize} unique business name suggestions.
+THE BUSINESS:
+${config.businessDescription}
+${config.industry ? `Industry: ${config.industry}` : ''}
+${config.competitorNames ? `Names they admire: ${config.competitorNames}` : ''}
+${config.otherDetails ? `Notes: ${config.otherDetails}` : ''}
 
-BUSINESS CONTEXT:
-- Description: ${config.businessDescription}
-${config.industry ? `- Industry: ${config.industry}` : ''}
-${config.competitorNames ? `- Competitor names they like: ${config.competitorNames}` : ''}
-${config.otherDetails ? `- Additional details: ${config.otherDetails}` : ''}
-- Target TLD: .${tld}
+WHAT MAKES A GREAT BUSINESS NAME:
+- It's memorable after hearing it once
+- It looks good in a logo, on a business card, in an app store
+- It has emotional resonance — it makes you FEEL something about the brand
+- It's easy to say, easy to spell, and sounds good spoken aloud
+- It works as a .${tld} domain (short enough, no hyphens, no confusion)
 
-NAMING PREFERENCES:
-- Preferred styles: ${stylesStr}
-- Phonetically transparent: ${config.phoneticTransparency || 'no preference'}
-- Domain obscurity (0=familiar, 100=very unique): ${obscurity}
+STYLE PREFERENCES: ${stylesStr}
+PHONETIC CLARITY: ${config.phoneticTransparency || 'no preference'}
+UNIQUENESS: ${obscurityDirective}
 
-${obscurityDirective}
+VARIETY IS CRITICAL: In every batch, include a MIX:
+- 2-3 safe, strong, straightforward names (the kind a Fortune 500 would pick)
+- 3-4 creative, distinctive names (the kind a well-funded startup would pick)
+- 2-3 bold, surprising, or unusual names (the kind that makes someone stop scrolling)
+This variety should be present in EVERY batch, regardless of how many batches have been generated.
 
-CREATIVITY (batch ${batchNumber}, seed ${seed}): ${creativityDirective}
-IMPORTANT: Generate completely DIFFERENT names each time, even for the same business description. Be surprising and varied.
+${existingNames.length > 0 ? `DO NOT REPEAT these names: ${existingNames.join(', ')}` : ''}
 
-${existingNames.length > 0 ? `ALREADY SUGGESTED (do NOT repeat): ${existingNames.join(', ')}` : ''}
-${rejectedNames.length > 0 ? `PREVIOUSLY REJECTED (try different approaches): ${rejectedNames.join(', ')}` : ''}
+SESSION SEED: ${seed}
+Generate DIFFERENT names every time. Never repeat yourself. Be fresh and surprising.
 
-CATEGORY: For each name, classify it into ONE of these categories: invented, real-word, compound, short, playful, elegant, human, metaphor, technical, geographic${stylesList.some(s => !['invented','real-word','compound','short','playful','elegant','human','metaphor','technical','geographic'].includes(s)) ? `, or use the user's custom category name if it fits` : ''}
+CATEGORY: Classify each name as one of: invented, real-word, compound, short, playful, elegant, human, metaphor, technical, geographic${stylesList.some(s => !['invented','real-word','compound','short','playful','elegant','human','metaphor','technical','geographic'].includes(s)) ? `, or a custom category if appropriate` : ''}
 
-DOMAIN VARIANTS — RULES:
-For each name, generate 1-7 domain variants (prefix/suffix combos). CRITICAL:
-1. READABILITY: combined string must read as clear separate words. Read aloud before including.
-   BAD: "hireaethelred", "useelara", "gettonix"
-   GOOD: "tryluminary", "goslate", "heyorca"
-2. No double-letter collisions at join points.
-3. Choose prefixes appropriate to the business type.
-4. Vary prefixes across names — don't reuse the same pattern for every name.
-5. Quality over quantity. 1 good variant beats 4 bad ones.
+DOMAIN VARIANTS — THIS IS CRITICAL, READ CAREFULLY:
+For each name, generate 2-5 alternative domain strings by adding a prefix or suffix. These MUST:
 
-Return ONLY a JSON array. Each object:
-- "name": business name (no .${tld})
-- "category": one of the category IDs above
-- "rationale": 1 sentence (max 15 words) explaining why this name fits the business. Be specific, not generic.
-- "variants": array of domain strings without .${tld}
+1. BE CONTEXTUALLY APPROPRIATE TO THE BUSINESS. Think about what the customer actually DOES:
+   - Hiring/staffing/contracting: "hire___", "team___", "___crew", "___works", "___staff"
+   - SaaS/software: "get___", "try___", "___app", "___hq"
+   - E-commerce/retail: "shop___", "buy___", "___store"
+   - Community/social: "join___", "meet___", "___hub"
+   - Agency/services: "___studio", "___labs", "___co"
+   - Food/restaurant: "eat___", "order___", "___eats"
+   - Finance: "___pay", "___fi", "___fund"
+   - Health/wellness: "___health", "___well", "my___"
+   - Education: "learn___", "___academy", "___ed"
+   Do NOT use generic prefixes like "use" or "get" when a business-specific one exists.
 
-Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance and leadership in the consulting space.","variants":["tryluminary","goluminary"]},{"name":"Bolt","category":"short","rationale":"Suggests speed and reliability for a logistics platform.","variants":["getbolt","bolthq"]}]`;
+2. READ CLEARLY when squished into one string. Test by reading it back:
+   - BAD: "hireaethelred" (unreadable), "useelara" (confusing double-e), "gettonix" (looks like "getto")
+   - GOOD: "hiretalon" (clear), "teamforged" (clear), "ironworksapp" (clear)
+
+3. NOT create accidental words at the join point. Check carefully.
+
+4. VARY the modifier across names — don't use the same prefix/suffix pattern for every name.
+
+OUTPUT FORMAT — Return ONLY a JSON array. No markdown. No explanation. Each object:
+{
+  "name": "BusinessName",
+  "category": "category-id",
+  "rationale": "One punchy sentence (max 15 words) on why this name works for THIS specific business.",
+  "variants": ["prefixname", "namesuffix", "etc"]
+}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -98,7 +102,7 @@ Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        temperature: Math.min(0.95 + (batchNumber * 0.03), 1.3),
+        temperature: 1.1,
         max_tokens: 16000,
         reasoning: { max_tokens: 1024 },
       }),
@@ -116,7 +120,7 @@ Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance
 
     let suggestions;
     try { suggestions = JSON.parse(cleaned); } catch {
-      console.error('Failed to parse:', cleaned);
+      console.error('Failed to parse:', cleaned.slice(0, 500));
       return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 });
     }
 
@@ -136,7 +140,7 @@ Example: [{"name":"Luminary","category":"elegant","rationale":"Evokes brilliance
           const p = nameLower[0] !== 't' ? 'try' : 'get';
           variants = [`${p}${nameLower}`];
         }
-        return { name, category: s.category || 'invented', rationale: typeof s.rationale === 'string' ? s.rationale.slice(0, 120) : '', variants };
+        return { name, category: s.category || 'invented', rationale: typeof s.rationale === 'string' ? s.rationale.slice(0, 150) : '', variants };
       });
 
     return NextResponse.json({ suggestions: sanitized });

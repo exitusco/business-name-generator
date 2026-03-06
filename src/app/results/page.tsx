@@ -92,9 +92,10 @@ function DomainRow({ domain, tld, available, method }: { domain: string; tld: st
 }
 
 // ===== DETAIL TRAY / MODAL =====
-function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
+function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved }: {
   card: CardData; defaultTld: string; onClose: () => void;
   onUpdate: (updater: (c: CardData) => CardData) => void;
+  onSave: () => void; isSaved: boolean;
 }) {
   const configRef = useRef<any>(null);
   useEffect(() => { try { configRef.current = JSON.parse(localStorage.getItem('nc_config') || '{}'); } catch {} }, []);
@@ -221,7 +222,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
         <PanelContent card={card} catColor={catColor} variantTld={variantTld} recheckingTld={recheckingTld}
           loadingVariants={loadingVariants} verifying={verifying} avAll={avAll} hasUnverified={hasUnverified}
           tldInput={tldInput} setTldInput={setTldInput} addingTld={addingTld}
-          onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} defaultTld={defaultTld} />
+          onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} />
       </div>
 
       {/* Desktop: bottom tray */}
@@ -234,7 +235,6 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
             <div className="flex items-center gap-3">
               <div className="w-8 h-1 rounded-full bg-white/10" />
               <h2 className="text-lg font-semibold" style={{ fontFamily: card.fontFamily }}>{card.name}</h2>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider" style={{ background: catColor + '25', color: catColor }}>{card.category}</span>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -244,7 +244,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
             <PanelContent card={card} catColor={catColor} variantTld={variantTld} recheckingTld={recheckingTld}
               loadingVariants={loadingVariants} verifying={verifying} avAll={avAll} hasUnverified={hasUnverified}
               tldInput={tldInput} setTldInput={setTldInput} addingTld={addingTld}
-              onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} defaultTld={defaultTld} />
+              onTldChange={handleVariantTldChange} onAddTld={handleAddTld} onMoreVariants={handleMoreVariants} onVerifyAll={handleVerifyAll} onSave={onSave} isSaved={isSaved} defaultTld={defaultTld} />
           </div>
         </div>
       </div>
@@ -253,13 +253,32 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate }: {
 }
 
 // Shared panel content used by both mobile fullscreen and desktop tray
-function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVariants, verifying, avAll, hasUnverified, tldInput, setTldInput, addingTld, onTldChange, onAddTld, onMoreVariants, onVerifyAll, defaultTld }: {
+function PanelContent({ card, catColor, variantTld, recheckingTld, loadingVariants, verifying, avAll, hasUnverified, tldInput, setTldInput, addingTld, onTldChange, onAddTld, onMoreVariants, onVerifyAll, onSave, isSaved, defaultTld }: {
   card: CardData; catColor: string; variantTld: string; recheckingTld: boolean; loadingVariants: boolean; verifying: boolean; avAll: number; hasUnverified: boolean;
   tldInput: string; setTldInput: (v: string) => void; addingTld: boolean;
-  onTldChange: (t: string) => void; onAddTld: () => void; onMoreVariants: () => void; onVerifyAll: () => void; defaultTld: string;
+  onTldChange: (t: string) => void; onAddTld: () => void; onMoreVariants: () => void; onVerifyAll: () => void; onSave: () => void; isSaved: boolean; defaultTld: string;
 }) {
   return (
     <div className="p-5 sm:p-6">
+      {/* Category tag + save button */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="px-2.5 py-1 rounded-lg text-xs font-medium uppercase tracking-wider"
+          style={{ background: catColor + '20', color: catColor, border: `1px solid ${catColor}30` }}>
+          {card.category}
+        </span>
+        <button onClick={onSave}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+            isSaved
+              ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30'
+              : 'bg-white/[0.05] text-white/50 hover:text-white/80 border border-[var(--border)] hover:border-[var(--accent-dim)]'
+          }`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+          </svg>
+          {isSaved ? 'Saved' : 'Save name'}
+        </button>
+      </div>
+
       {/* Rationale */}
       {card.rationale && (
         <p className="text-sm text-[var(--text-secondary)] mb-4 italic" style={{ borderLeft: `2px solid ${catColor}40`, paddingLeft: '12px' }}>
@@ -363,7 +382,6 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
     <div className="name-card card-enter rounded-2xl overflow-hidden relative group cursor-pointer" onClick={onExplore}
       style={{ animationDelay: `${index * 60}ms`, border: `2px solid ${borderColor}`, boxShadow: shadow }}>
       <div className="h-40 sm:h-48 flex items-center justify-center p-6 relative" style={{ background: card.gradient }}>
-        <span className="absolute top-3 left-3 px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider" style={{ background: catColor + '25', color: catColor, border: `1px solid ${catColor}40` }}>{card.category}</span>
         <h2 className="text-2xl sm:text-3xl text-center leading-tight break-words max-w-full" style={{ fontFamily: card.fontFamily, color: card.textColor, textShadow: '0 2px 12px rgba(0,0,0,.3)' }}>{card.name}</h2>
         <button onClick={e => { e.stopPropagation(); onSave(card); }}
           className={`absolute top-3 right-3 p-2 rounded-lg transition-all ${isSaved ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-black/20 text-white/60 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-black/40'}`}>
@@ -525,7 +543,7 @@ export default function ResultsPage() {
         )}
         <div ref={sentinelRef} className="h-20" />
       </main>
-      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} />}
+      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} />}
     </div>
   );
 }

@@ -31,10 +31,10 @@ export default function Header() {
           className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 hover:opacity-80 transition-opacity"
         >
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[#6b4d8a] flex items-center justify-center">
-            <span className="text-[#0a0a0f] font-bold text-sm" style={{ fontFamily: "'Syne', sans-serif" }}>N</span>
+            <span className="text-[#0a0a0f] font-bold text-sm" style={{ fontFamily: "'Syne', sans-serif" }}>P</span>
           </div>
           <span className="text-base font-semibold tracking-tight hidden sm:inline" style={{ fontFamily: "'Syne', sans-serif" }}>
-            NameCraft
+            Poacher
           </span>
         </button>
 
