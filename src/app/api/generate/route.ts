@@ -5,7 +5,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { config, existingNames = [], batchSize = 10, nonce = '', conversationContext = '' } = body;
+    const { config, existingNames = [], batchSize = 10, nonce = '', chatHistory = [] } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
@@ -56,7 +56,24 @@ This variety should be present in EVERY batch, regardless of how many batches ha
 
 ${existingNames.length > 0 ? `DO NOT REPEAT these names: ${existingNames.join(', ')}` : ''}
 
-${conversationContext ? `CONVERSATION CONTEXT (the user has been chatting with a naming assistant and provided this guidance): ${conversationContext}` : ''}
+${chatHistory.length > 0 ? `CONVERSATION WITH THE USER (read carefully):
+The user has been chatting with a naming assistant while browsing names. Here is their conversation:
+
+${chatHistory.map((m: any) => {
+  if (m.role === 'system-event') return `[EVENT] ${m.content}`;
+  if (m.role === 'user') return `USER: ${m.content}`;
+  return `ASSISTANT: ${m.content}`;
+}).join('\n')}
+
+HOW TO WEIGH THIS CONVERSATION vs THE CONFIGURATION ABOVE:
+- The CONFIGURATION (styles, obscurity, industry, etc.) represents the user's DELIBERATE baseline preferences. These are your foundation.
+- The CONVERSATION is real-time feedback layered on top. How much it should shift your output depends on:
+  * EXPLICIT INSTRUCTIONS from the user (e.g. "only show me two-word names") → these OVERRIDE the configuration
+  * STRONG PREFERENCES expressed repeatedly → moderate shift from baseline
+  * A SINGLE SAVE EVENT (e.g. [EVENT] Saved "Carrot") → very weak signal. Do NOT pivot your entire approach based on one save. It's just one data point.
+  * ASSISTANT COMMENTARY about what the user "seems to like" → this is the assistant's interpretation, not the user's words. Treat it as a hint, not a directive.
+  * SHORT CONVERSATIONS with few user messages → barely shift from the configured baseline
+- When in doubt, lean toward the configured preferences. The conversation supplements; it doesn't replace.` : ''}
 
 SESSION SEED: ${seed}
 Generate DIFFERENT names every time. Never repeat yourself. Be fresh and surprising.

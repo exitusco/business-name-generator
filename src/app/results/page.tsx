@@ -94,10 +94,10 @@ function DomainRow({ domain, tld, available, method }: { domain: string; tld: st
 }
 
 // ===== DETAIL TRAY / MODAL =====
-function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved }: {
+function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved, chatOpen }: {
   card: CardData; defaultTld: string; onClose: () => void;
   onUpdate: (updater: (c: CardData) => CardData) => void;
-  onSave: () => void; isSaved: boolean;
+  onSave: () => void; isSaved: boolean; chatOpen: boolean;
 }) {
   const configRef = useRef<any>(null);
   useEffect(() => { try { configRef.current = JSON.parse(localStorage.getItem('nc_config') || '{}'); } catch {} }, []);
@@ -213,7 +213,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved }: {
   return (
     <>
       {/* Mobile: fullscreen overlay */}
-      <div className="sm:hidden fixed inset-0 z-[100] bg-[var(--bg-primary)] overflow-y-auto">
+      <div className="sm:hidden fixed inset-0 z-[85] bg-[var(--bg-primary)] overflow-y-auto pb-16">
         {/* Close bar */}
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-b border-[var(--border)]">
           <span className="text-sm font-medium">{card.name}</span>
@@ -228,7 +228,7 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, isSaved }: {
       </div>
 
       {/* Desktop: bottom tray */}
-      <div className="hidden sm:block fixed inset-x-0 bottom-0 z-[100]" onClick={onClose}>
+      <div className="hidden sm:block fixed inset-x-0 bottom-0 z-[75]" style={{ right: chatOpen ? '340px' : '0' }} onClick={onClose}>
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative max-h-[60vh] bg-[var(--bg-secondary)] border-t border-[var(--border)] rounded-t-2xl overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}>
@@ -436,7 +436,6 @@ export default function ResultsPage() {
   const [chatOpen, setChatOpen] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const conversationContextRef = useRef('');
   const chatOpenRef = useRef(true);
   const chatMessagesRef = useRef<ChatMsg[]>([]);
 
@@ -470,7 +469,7 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const generateBatch = useCallback(async (context?: string, dividerText?: string) => {
+  const generateBatch = useCallback(async (dividerText?: string) => {
     if (loadingRef.current) return;
     if (!configRef.current) {
       try { const c = localStorage.getItem('nc_config'); if (c) configRef.current = JSON.parse(c); } catch {}
@@ -484,7 +483,7 @@ export default function ResultsPage() {
         body: JSON.stringify({
           config: configRef.current, existingNames: existingNamesRef.current, batchSize: 10,
           nonce: Math.random().toString(36).slice(2, 10),
-          conversationContext: context || conversationContextRef.current || '',
+          chatHistory: chatMessagesRef.current.slice(-20).map(m => ({ role: m.role, content: m.content })),
         }) });
       if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || 'Failed'); }
       const { suggestions } = await r.json();
@@ -537,14 +536,20 @@ export default function ResultsPage() {
     setChatMessages(prev => [...prev, userMsg]);
     setChatLoading(true);
     try {
-      const { message, generateNames, namingGuidance } = await callChatApi([...chatMessagesRef.current, userMsg]);
-      if (message) {
-        const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, role: 'assistant', content: message, timestamp: Date.now() };
+      const { message, generateNames, suggestedChanges = [] } = await callChatApi([...chatMessagesRef.current, userMsg]);
+      if (message || suggestedChanges.length > 0) {
+        const aiMsg: ChatMsg = {
+          id: `ai-${Date.now()}`, role: 'assistant', content: message || '', timestamp: Date.now(),
+          suggestedChanges: suggestedChanges.map((sc: any) => ({ ...sc, status: 'pending' as const })),
+        };
         setChatMessages(prev => [...prev, aiMsg]);
         if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
       }
-      if (namingGuidance) conversationContextRef.current = namingGuidance;
-      if (generateNames) generateBatch(namingGuidance || conversationContextRef.current, message || 'New direction based on your feedback');
+      if (generateNames) {
+        const genEvent: ChatMsg = { id: `event-gen-${Date.now()}`, role: 'system-event', content: 'Generating new names...', timestamp: Date.now() };
+        setChatMessages(prev => [...prev, genEvent]);
+        generateBatch(message || 'New direction based on your feedback');
+      }
     } catch (err) { console.error('Chat error:', err); } finally { setChatLoading(false); }
   }, [callChatApi, generateBatch]);
 
@@ -572,14 +577,16 @@ export default function ResultsPage() {
       (async () => {
         setChatLoading(true);
         try {
-          const { message, generateNames, namingGuidance } = await callChatApi([...chatMessagesRef.current, eventMsg], [card.name]);
-          if (message) {
-            const aiMsg: ChatMsg = { id: `ai-${Date.now()}`, role: 'assistant', content: message, timestamp: Date.now() };
+          const { message, suggestedChanges = [] } = await callChatApi([...chatMessagesRef.current, eventMsg], [card.name]);
+          if (message || suggestedChanges.length > 0) {
+            const aiMsg: ChatMsg = {
+              id: `ai-${Date.now()}`, role: 'assistant', content: message || '', timestamp: Date.now(),
+              suggestedChanges: suggestedChanges.map((sc: any) => ({ ...sc, status: 'pending' as const })),
+            };
             setChatMessages(prev => [...prev, aiMsg]);
             if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
           }
-          if (namingGuidance) conversationContextRef.current = namingGuidance;
-          if (generateNames) generateBatch(namingGuidance || conversationContextRef.current, message || `Inspired by "${card.name}"`);
+          // Hard guardrail: saves never trigger new name generation
         } catch {} finally { setChatLoading(false); }
       })();
     }
@@ -587,6 +594,58 @@ export default function ResultsPage() {
 
   const activeCard = activeCardId ? cards.find(c => c.id === activeCardId) : null;
   const updateCard = useCallback((id: string) => (fn: (c: CardData) => CardData) => { setCards(prev => prev.map(c => c.id === id ? fn(c) : c)); }, []);
+
+  // --- Config change accept/reject ---
+  const handleAcceptChange = useCallback((msgId: string, changeIndex: number) => {
+    setChatMessages(prev => prev.map(msg => {
+      if (msg.id !== msgId || !msg.suggestedChanges) return msg;
+      const updated = [...msg.suggestedChanges];
+      updated[changeIndex] = { ...updated[changeIndex], status: 'accepted' };
+      return { ...msg, suggestedChanges: updated };
+    }));
+
+    // Apply the change to config
+    const msg = chatMessages.find(m => m.id === msgId);
+    const change = msg?.suggestedChanges?.[changeIndex];
+    if (!change || !configRef.current) return;
+
+    if (change.action === 'append' && change.field === 'otherDetails') {
+      const existing = configRef.current.otherDetails || '';
+      configRef.current.otherDetails = existing ? `${existing}. ${change.value}` : change.value;
+    } else {
+      configRef.current[change.field] = change.value;
+    }
+
+    // Persist to localStorage
+    localStorage.setItem('nc_config', JSON.stringify(configRef.current));
+
+    // Update TLD if that changed
+    if (change.field === 'tld') setTld(change.value);
+
+    // System event
+    const eventMsg: ChatMsg = {
+      id: `event-cfg-${Date.now()}`, role: 'system-event',
+      content: `Updated ${change.label} → ${change.displayValue}`, timestamp: Date.now(),
+    };
+    setChatMessages(prev => [...prev, eventMsg]);
+
+    // Generate new names with updated config
+    const genEvent: ChatMsg = {
+      id: `event-gen-cfg-${Date.now()}`, role: 'system-event',
+      content: 'Generating new names with updated settings...', timestamp: Date.now(),
+    };
+    setChatMessages(prev => [...prev, genEvent]);
+    generateBatch(`Updated ${change.label} to ${change.displayValue}`);
+  }, [chatMessages, generateBatch]);
+
+  const handleRejectChange = useCallback((msgId: string, changeIndex: number) => {
+    setChatMessages(prev => prev.map(msg => {
+      if (msg.id !== msgId || !msg.suggestedChanges) return msg;
+      const updated = [...msg.suggestedChanges];
+      updated[changeIndex] = { ...updated[changeIndex], status: 'rejected' };
+      return { ...msg, suggestedChanges: updated };
+    }));
+  }, []);
 
   // Build grid with dividers
   const gridItems: Array<{ type: 'card'; card: CardData; index: number } | { type: 'divider'; text: string; id: number }> = [];
@@ -637,9 +696,9 @@ export default function ResultsPage() {
             <div className="sm:hidden h-16" />
           </div>
         </main>
-        <ChatSidebar messages={chatMessages} onSend={handleChatSend} isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} />
+        <ChatSidebar messages={chatMessages} onSend={handleChatSend} onAcceptChange={handleAcceptChange} onRejectChange={handleRejectChange} isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} />
       </div>
-      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} />}
+      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} isSaved={savedNames.has(activeCard.name)} chatOpen={chatOpen} />}
     </div>
   );
 }

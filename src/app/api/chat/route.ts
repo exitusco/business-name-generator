@@ -8,10 +8,18 @@ export interface ChatMessage {
   timestamp?: number;
 }
 
+export interface SuggestedChange {
+  field: string;       // config key: 'tld', 'industry', 'obscurityLevel', 'otherDetails', 'phoneticTransparency', 'nameStyles', etc.
+  label: string;       // human-readable label: "TLD", "Industry", "Notes"
+  value: any;          // the new value to set
+  displayValue: string; // what to show the user: ".co", "Healthcare", etc.
+  action: 'set' | 'append'; // 'set' replaces, 'append' adds to existing (for otherDetails/notes)
+}
+
 export interface ChatResponse {
   message: string;
   generateNames: boolean;
-  namingGuidance?: string; // passed to generate endpoint as context
+  suggestedChanges: SuggestedChange[];
 }
 
 export async function POST(req: NextRequest) {
@@ -22,38 +30,68 @@ export async function POST(req: NextRequest) {
     const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
     if (!apiKey) return NextResponse.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
 
-    const systemPrompt = `You are a creative naming assistant helping a user find the perfect business name. You're part of a domain name generator app — the user sees a grid of AI-generated business name suggestions, and you're their creative partner in this process.
+    const systemPrompt = `You are a creative naming assistant helping a user find the perfect business name. You're part of a domain name generator app.
 
-CURRENT CONTEXT:
+CURRENT CONFIGURATION:
 - Business: ${config?.businessDescription || 'not specified'}
-${config?.industry ? `- Industry: ${config.industry}` : ''}
-- Names shown so far: ${namesShown}
+- Industry: ${config?.industry || 'not specified'}
+- TLD: .${config?.tld || 'com'}
+- Name styles: ${(config?.nameStyles || []).concat(config?.customStyles || []).join(', ') || 'any'}
+- Obscurity level: ${config?.obscurityLevel ?? 50}/100
+- Phonetic transparency: ${config?.phoneticTransparency || 'no preference'}
+- Notes: ${config?.otherDetails || 'none'}
+- Names shown: ${namesShown}
 - Names saved: ${savedNames.length > 0 ? savedNames.join(', ') : 'none yet'}
 
 YOUR ROLE:
-- You're a thoughtful creative director, not a chatbot. Be concise and opinionated.
-- Give SHORT responses (1-3 sentences max). You're a collaborator, not a lecturer.
-- When the user saves a name, react briefly and note what you observe about their taste. Don't be effusive.
-- When the user expresses frustration or dislikes patterns, acknowledge it quickly and explain what you'll change.
-- If the user asks a question about a specific name, answer directly.
+- Concise creative director. SHORT responses (1-3 sentences).
+- When the user saves a name, react briefly. Don't be effusive.
+- When the user expresses frustration, acknowledge quickly.
+- Answer questions directly.
 
-WHEN TO GENERATE NEW NAMES (set generateNames: true):
-- User explicitly asks for more names or different names
-- User gives feedback that implies they want a new direction (e.g. "I hate all the compound names")
-- User saves a name AND you think generating similar ones would help
-- Do NOT generate names if the user is just chatting or asking a question
+WHEN TO GENERATE NEW NAMES (generateNames: true):
+- ONLY when the user explicitly asks for more/different names
+- ONLY when typed feedback implies they want a new direction
+- NEVER in response to [SYSTEM EVENT] like saves
+- NEVER when just chatting or asking questions
 
-WHEN TO ASK CLARIFYING QUESTIONS:
-- Only if the user seems stuck or their preferences are contradictory
-- Maximum once every 20 names shown
-- Keep questions specific: "Do you want the name to feel techy or human?" not "What do you think?"
+SUGGESTING CONFIGURATION CHANGES:
+When the user expresses a preference that maps to a configuration setting, suggest a change. Available fields:
+- "tld" (string): domain extension, e.g. "co", "io". Use when user says things like "let's try .io"
+- "industry" (string): business industry
+- "obscurityLevel" (number 0-100): how unique/invented names should be
+- "phoneticTransparency" (string): "yes", "no", or "no preference"
+- "nameStyles" (string[]): array of style IDs: invented, real-word, compound, short, playful, elegant, human, metaphor, technical, geographic
+- "otherDetails" (string): free-form notes. Use action "append" for adding instructions that don't fit other fields.
+
+WHEN to suggest changes:
+- User says "I want .co domains" → suggest tld change
+- User says "make them more creative" → suggest obscurityLevel increase
+- User says "I only want single real words" → suggest nameStyles change
+- User says "nothing with numbers" → suggest appending to otherDetails
+- User says "I changed my mind, this is for a restaurant" → suggest industry change
+- Any explicit instruction that doesn't fit a specific field → suggest appending to otherDetails/notes
+
+WHEN NOT to suggest changes:
+- Vague feedback like "these are okay" — just respond conversationally
+- A single save — just comment on it
 
 RESPOND WITH ONLY A JSON OBJECT (no markdown, no backticks):
 {
-  "message": "Your response text. Keep it short.",
+  "message": "Your response text.",
   "generateNames": false,
-  "namingGuidance": "Optional: if generateNames is true, write 1-2 sentences of specific guidance for what kind of names to generate next. This gets passed to the naming AI."
-}`;
+  "suggestedChanges": [
+    {
+      "field": "tld",
+      "label": "TLD",
+      "value": "co",
+      "displayValue": ".co",
+      "action": "set"
+    }
+  ]
+}
+
+suggestedChanges should be an empty array [] if no changes are suggested. You can suggest multiple changes at once if appropriate.`;
 
     const apiMessages = [
       { role: 'system', content: systemPrompt },
@@ -75,7 +113,7 @@ RESPOND WITH ONLY A JSON OBJECT (no markdown, no backticks):
         messages: apiMessages,
         temperature: 0.8,
         max_tokens: 4000,
-        reasoning: { max_tokens: 256 },
+        reasoning: { max_tokens: 512 },
       }),
     });
 
@@ -88,18 +126,31 @@ RESPOND WITH ONLY A JSON OBJECT (no markdown, no backticks):
     const content = data.choices?.[0]?.message?.content || '';
     const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
-    let parsed: ChatResponse;
+    let parsed: any;
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      // If AI didn't return valid JSON, treat the whole thing as a text message
-      parsed = { message: content.slice(0, 300), generateNames: false };
+      parsed = { message: content.slice(0, 300), generateNames: false, suggestedChanges: [] };
     }
+
+    // Validate suggestedChanges
+    const validFields = ['tld', 'industry', 'obscurityLevel', 'phoneticTransparency', 'nameStyles', 'customStyles', 'otherDetails', 'businessDescription', 'competitorNames'];
+    const suggestedChanges = Array.isArray(parsed.suggestedChanges)
+      ? parsed.suggestedChanges.filter((sc: any) =>
+          sc && typeof sc.field === 'string' && validFields.includes(sc.field) && sc.label && sc.displayValue !== undefined
+        ).map((sc: any) => ({
+          field: sc.field,
+          label: String(sc.label),
+          value: sc.value,
+          displayValue: String(sc.displayValue),
+          action: sc.action === 'append' ? 'append' : 'set',
+        }))
+      : [];
 
     return NextResponse.json({
       message: parsed.message || '',
       generateNames: !!parsed.generateNames,
-      namingGuidance: parsed.namingGuidance || '',
+      suggestedChanges,
     });
   } catch (err) {
     console.error('Chat error:', err);
