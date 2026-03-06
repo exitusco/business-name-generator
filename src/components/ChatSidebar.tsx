@@ -62,10 +62,10 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
       {messages.map((msg) => (
         <div key={msg.id}>
           {msg.role === 'system-event' ? (
-            <div className="flex items-center gap-2 py-1.5">
-              <div className="h-px flex-1 bg-[var(--border)]" />
-              <span className="text-[10px] text-[var(--text-secondary)]/40 shrink-0 uppercase tracking-wider">{msg.content}</span>
-              <div className="h-px flex-1 bg-[var(--border)]" />
+            <div className="flex items-center gap-2 py-1.5 min-w-0">
+              <div className="h-px shrink-0 w-4 bg-[var(--border)]" />
+              <span className="text-[10px] text-[var(--text-secondary)]/40 uppercase tracking-wider text-center break-words min-w-0">{msg.content}</span>
+              <div className="h-px shrink-0 w-4 bg-[var(--border)]" />
             </div>
           ) : msg.role === 'user' ? (
             /* User messages: right-aligned, subtle accent left border, no bubble background */
@@ -175,7 +175,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"/></svg>
               </button>
             </div>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3">
               {messageListContent}
             </div>
             {inputBar}
@@ -210,7 +210,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 17l5-5-5-5M6 17l5-5-5-5"/></svg>
               </button>
             </div>
-            <div ref={!isOpen ? undefined : scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div ref={!isOpen ? undefined : scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3">
               {messageListContent}
             </div>
             {inputBar}
