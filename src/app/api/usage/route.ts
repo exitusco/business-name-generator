@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ usage: { generation: 0, domain_check: 0, saved_name: 0 }, limits: null, periodStart: null, periodEnd: null });
     }
 
-    const meta: { period_start?: string; period_end?: string } | null = await ensureUserMeta(userId, anonymousId) as any;
+    const meta = await ensureUserMeta(userId, anonymousId);
     const periodStart = meta?.period_start || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const periodEnd = meta?.period_end || null;
 
