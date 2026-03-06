@@ -473,7 +473,7 @@ export default function ResultsPage() {
     try {
       const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          config: configRef.current, existingNames: existingNamesRef.current, batchSize: 10,
+          config: configRef.current, existingNames: existingNamesRef.current, savedNames: Array.from(savedNames), batchSize: 10,
           nonce: Math.random().toString(36).slice(2, 10),
           chatHistory: chatMessagesRef.current.slice(-20).map(m => ({ role: m.role, content: m.content })),
         }) });
@@ -537,7 +537,8 @@ export default function ResultsPage() {
         setChatMessages(prev => [...prev, aiMsg]);
         if (!chatOpenRef.current) setUnreadCount(prev => prev + 1);
       }
-      if (generateNames) {
+      // If there are suggested changes, do NOT auto-generate — wait for accept/reject
+      if (generateNames && suggestedChanges.length === 0) {
         const genEvent: ChatMsg = { id: `event-gen-${Date.now()}`, role: 'system-event', content: 'Generating new names...', timestamp: Date.now() };
         setChatMessages(prev => [...prev, genEvent]);
         generateBatch(message || 'New direction based on your feedback');
@@ -631,13 +632,26 @@ export default function ResultsPage() {
   }, [chatMessages, generateBatch]);
 
   const handleRejectChange = useCallback((msgId: string, changeIndex: number) => {
+    // Mark as rejected
     setChatMessages(prev => prev.map(msg => {
       if (msg.id !== msgId || !msg.suggestedChanges) return msg;
       const updated = [...msg.suggestedChanges];
       updated[changeIndex] = { ...updated[changeIndex], status: 'rejected' };
       return { ...msg, suggestedChanges: updated };
     }));
-  }, []);
+
+    // Find the change details for context
+    const msg = chatMessages.find(m => m.id === msgId);
+    const change = msg?.suggestedChanges?.[changeIndex];
+    if (!change) return;
+
+    // Send rejection as system event so the AI knows
+    const eventMsg: ChatMsg = {
+      id: `event-reject-${Date.now()}`, role: 'system-event',
+      content: `Rejected suggestion: ${change.label} → ${change.displayValue}`, timestamp: Date.now(),
+    };
+    setChatMessages(prev => [...prev, eventMsg]);
+  }, [chatMessages]);
 
   // Build grid with dividers
   const gridItems: Array<{ type: 'card'; card: CardData; index: number } | { type: 'divider'; text: string; id: number }> = [];

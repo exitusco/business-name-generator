@@ -5,7 +5,7 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { config, existingNames = [], batchSize = 10, nonce = '', chatHistory = [] } = body;
+    const { config, existingNames = [], savedNames = [], batchSize = 10, nonce = '', chatHistory = [] } = body;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     const model = process.env.AI_MODEL || 'google/gemini-2.5-flash-preview';
@@ -55,6 +55,9 @@ VARIETY IS CRITICAL: In every batch, include a MIX:
 This variety should be present in EVERY batch, regardless of how many batches have been generated.
 
 ${existingNames.length > 0 ? `DO NOT REPEAT these names: ${existingNames.join(', ')}` : ''}
+
+${savedNames.length > 0 ? `NAMES THE USER HAS SAVED (they like these — use them as a signal of taste, but don't over-index on them):
+${savedNames.join(', ')}` : ''}
 
 ${chatHistory.length > 0 ? `CONVERSATION WITH THE USER (read carefully):
 The user has been chatting with a naming assistant while browsing names. Here is their conversation:
