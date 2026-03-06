@@ -15,7 +15,7 @@ export async function trackUsage(
   const identifier = userId || anonymousId;
   if (!identifier) return;
 
-  const { error } = await supabase.from('usage_events').insert({
+  const { error } = await supabase.from('usage_events' as any).insert({
     user_id: userId,
     anonymous_id: anonymousId,
     metric,
@@ -75,7 +75,7 @@ export async function ensureUserMeta(
   const supabase = getSupabase();
 
   // Try to find existing
-  let query = supabase.from('user_meta').select('*');
+  let query = supabase.from('user_meta' as any).select('*');
   if (userId) {
     query = query.eq('clerk_user_id', userId);
   } else if (anonymousId) {
@@ -96,7 +96,7 @@ export async function ensureUserMeta(
   const periodEnd = new Date(periodStart);
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-  const { data: created, error } = await supabase.from('user_meta').insert({
+  const { data: created, error } = await supabase.from('user_meta' as any).insert({
     clerk_user_id: userId,
     anonymous_id: anonymousId,
     first_seen_at: now,
