@@ -2,15 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
-import ModelSelector from '@/components/ModelSelector';
-import { useFeatures } from '@/hooks/useFeatures';
+import AppShell from '@/components/AppShell';
 import { NAME_STYLES, CATEGORY_COLORS } from '@/lib/types';
-import { AI_MODELS } from '@/lib/features';
 
 export default function ConfigurePage() {
   const router = useRouter();
-  const features = useFeatures();
   const [industry, setIndustry] = useState('');
   const [nameStyles, setNameStyles] = useState<string[]>([]);
   const [customStyles, setCustomStyles] = useState<string[]>([]);
@@ -23,7 +19,6 @@ export default function ConfigurePage() {
   const [tld, setTld] = useState('com');
   const [tldError, setTldError] = useState('');
   const [tldValidating, setTldValidating] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(features.defaultModel);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -40,7 +35,6 @@ export default function ConfigurePage() {
           setOtherDetails(c.otherDetails || '');
           setObscurityLevel(c.obscurityLevel ?? 50);
           setTld(c.tld || 'com');
-          if (c.selectedModel) setSelectedModel(c.selectedModel);
         } catch {}
       }
     }
@@ -88,7 +82,7 @@ export default function ConfigurePage() {
     const config = {
       businessDescription: desc, industry, nameStyles, customStyles,
       phoneticTransparency, domainModifiers, competitorNames, otherDetails,
-      obscurityLevel, tld: tld || 'com', selectedModel,
+      obscurityLevel, tld: tld || 'com',
     };
     if (typeof window !== 'undefined') localStorage.setItem('nc_config', JSON.stringify(config));
     router.push('/results');
@@ -96,7 +90,7 @@ export default function ConfigurePage() {
 
   return (
     <div className="min-h-screen">
-      <Header />
+      <AppShell />
       <main className="max-w-2xl mx-auto px-4 py-8 pb-28">
         <h1 className="text-2xl sm:text-3xl mb-2" style={{ fontFamily: "'DM Serif Display', serif" }}>
           Fine-tune your names
@@ -207,13 +201,6 @@ export default function ConfigurePage() {
                   }`}>{opt}</button>
               ))}
             </div>
-          </div>
-
-          {/* AI Model */}
-          <div>
-            <label className="block text-sm font-medium mb-2 text-[var(--text-secondary)]">AI Model</label>
-            <p className="text-xs text-[var(--text-secondary)]/60 mb-3">Choose which AI generates your name suggestions</p>
-            <ModelSelector selectedModel={selectedModel} onSelect={setSelectedModel} availableModels={features.availableModels} />
           </div>
 
           {/* Competitors */}

@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import AppShell from '@/components/AppShell';
 import ChatSidebar from '@/components/ChatSidebar';
 import { UpgradePrompt, ProBadge } from '@/components/ProGate';
 import { useFeatures } from '@/hooks/useFeatures';
 import type { ChatMsg } from '@/components/ChatSidebar';
-import { DEFAULT_FREE_MODEL, AI_MODELS } from '@/lib/features';
+import { DEFAULT_FREE_MODEL } from '@/lib/features';
 import { NameCardData, DomainCheck, SavedName, CARD_FONTS, GRADIENTS, CATEGORY_COLORS, COMMON_TLDS } from '@/lib/types';
 import { pickTextColor, STATUS_COLORS as SC } from '@/lib/colors';
 import { partitionCached, setCache } from '@/lib/domain-cache';
@@ -432,6 +432,21 @@ export default function ResultsPage() {
   const selectedModelRef = useRef(features.defaultModel);
   useEffect(() => { selectedModelRef.current = selectedModel; }, [selectedModel]);
 
+  // Listen for model changes from SubHeader (same tab via custom event)
+  useEffect(() => {
+    const handler = () => {
+      const m = localStorage.getItem('nc_selected_model');
+      if (m && m !== selectedModelRef.current) {
+        setSelectedModel(m);
+        selectedModelRef.current = m;
+      }
+    };
+    window.addEventListener('storage', handler);
+    // Also poll since storage event doesn't fire in the same tab
+    const interval = setInterval(handler, 1000);
+    return () => { window.removeEventListener('storage', handler); clearInterval(interval); };
+  }, []);
+
   const [cards, setCards] = useState<CardData[]>([]);
   const [dividers, setDividers] = useState<Record<number, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
@@ -490,7 +505,10 @@ export default function ResultsPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try { const s = localStorage.getItem('nc_saved'); if (s) setSavedNames(new Set(JSON.parse(s).map((x: SavedName) => x.name))); } catch {}
-      try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); if (configRef.current.selectedModel) { setSelectedModel(configRef.current.selectedModel); selectedModelRef.current = configRef.current.selectedModel; } } } catch {}
+      try { const c = localStorage.getItem('nc_config'); if (c) { configRef.current = JSON.parse(c); setTld(configRef.current.tld || 'com'); } } catch {}
+      // Read model preference (user-level, managed by SubHeader)
+      const savedModel = localStorage.getItem('nc_selected_model');
+      if (savedModel) { setSelectedModel(savedModel); selectedModelRef.current = savedModel; }
       if (!configRef.current) configRef.current = { businessDescription: localStorage.getItem('nc_description') || '', tld: 'com' };
       if (window.innerWidth < 640) setChatOpen(false);
 
@@ -811,24 +829,7 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen">
-      <Header onRefresh={handleRefresh} />
-      {/* Sticky model bar */}
-      <div className={`sticky top-14 z-40 backdrop-blur-xl bg-[#0a0a0f]/80 border-b border-[var(--border)] transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
-        <div className="max-w-6xl mx-auto px-4 h-9 flex items-center gap-3 text-xs text-[var(--text-secondary)]">
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
-            <span>{AI_MODELS.find(m => m.id === selectedModel)?.name || 'Unknown model'}</span>
-            <span className="text-[var(--text-secondary)]/40">·</span>
-            <span className="text-[var(--text-secondary)]/40">{AI_MODELS.find(m => m.id === selectedModel)?.provider}</span>
-          </div>
-          <button
-            onClick={() => router.push('/configure')}
-            className="text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors underline underline-offset-2 decoration-[var(--accent)]/20 hover:decoration-[var(--accent)]/50"
-          >
-            change
-          </button>
-        </div>
-      </div>
+      <AppShell onRefresh={handleRefresh} />
       <div className="flex">
         <main className={`flex-1 min-w-0 px-4 py-6 transition-all duration-300 ${chatOpen ? 'sm:mr-[340px]' : ''}`}>
           <div className="max-w-6xl mx-auto">

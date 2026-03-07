@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import AppShell from '@/components/AppShell';
 
 export default function Home() {
   const [description, setDescription] = useState('');
@@ -27,7 +27,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <AppShell />
       <div className="flex-1 flex flex-col items-center justify-center px-4 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 pointer-events-none">

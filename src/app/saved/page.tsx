@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Header from '@/components/Header';
+import AppShell from '@/components/AppShell';
 import { SavedName } from '@/lib/types';
 
 function porkbunSearchUrl(domain: string): string {
@@ -34,7 +34,7 @@ export default function SavedPage() {
 
   return (
     <div className="min-h-screen">
-      <Header />
+      <AppShell />
       <main className="max-w-4xl mx-auto px-4 py-8">
         <h1
           className="text-2xl sm:text-3xl mb-2"
