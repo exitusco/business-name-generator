@@ -4,7 +4,7 @@ import Header from '@/components/Header';
 import SubHeader from '@/components/SubHeader';
 
 interface AppShellProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   onRefresh?: () => void;
 }
 
