@@ -38,12 +38,12 @@ export default function SubHeader() {
 
   // Usage state
   const [usage, setUsage] = useState<UsageData | null>(null);
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
   const [usageOpen, setUsageOpen] = useState(false);
   const usageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchUsage();
-    // Refresh usage every 60s
     const interval = setInterval(fetchUsage, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -60,10 +60,25 @@ export default function SubHeader() {
     try {
       const r = await fetch('/api/usage');
       if (r.ok) {
-        const { usage: u } = await r.json();
+        const { usage: u, periodEnd: pe } = await r.json();
         if (u) setUsage(u);
+        if (pe) setPeriodEnd(pe);
       }
     } catch {}
+  };
+
+  // Format reset date
+  const formatResetDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const end = new Date(dateStr);
+    const now = new Date();
+    const diffMs = end.getTime() - now.getTime();
+    if (diffMs <= 0) return 'resets soon';
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 1) return `resets in ${Math.max(diffHours, 1)} hour${diffHours !== 1 ? 's' : ''}`;
+    if (diffDays <= 7) return `resets in ${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+    return `resets on ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
   };
 
   // Determine limits based on tier
@@ -158,12 +173,15 @@ export default function SubHeader() {
                   );
                 })}
               </div>
-              <div className="px-3 py-2 border-t border-[var(--border)]">
+              <div className="px-3 py-2 border-t border-[var(--border)] flex items-center justify-between">
+                {formatResetDate(periodEnd) && (
+                  <span className="text-[10px] text-[var(--text-secondary)]/40">{formatResetDate(periodEnd)}</span>
+                )}
                 <button
                   onClick={() => { router.push('/pricing'); setUsageOpen(false); }}
                   className="text-[10px] text-[var(--accent)]/60 hover:text-[var(--accent)] transition-colors"
                 >
-                  {features.tier === 'pro' ? 'Manage subscription' : 'Upgrade for higher limits'}
+                  {features.tier === 'pro' ? 'Manage subscription' : 'Upgrade to Pro'}
                 </button>
               </div>
             </div>

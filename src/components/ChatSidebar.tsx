@@ -213,7 +213,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
       {/* ===== DESKTOP ===== */}
       <div className="hidden sm:block">
         {isOpen ? (
-          <div className="fixed top-14 right-0 bottom-0 w-[340px] bg-[var(--bg-secondary)] border-l border-[var(--border)] z-[80] flex flex-col">
+          <div className="fixed top-[5.75rem] right-0 bottom-0 w-[340px] bg-[var(--bg-secondary)] border-l border-[var(--border)] z-[35] flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
               <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Naming Assistant</span>
               <button onClick={onToggle} className="p-1 rounded hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]" title="Hide chat">
@@ -227,7 +227,7 @@ export default function ChatSidebar({ messages, onSend, onAcceptChange, onReject
           </div>
         ) : (
           <button onClick={onToggle}
-            className="fixed top-1/2 -translate-y-1/2 right-0 z-[80] bg-[var(--bg-secondary)] border border-[var(--border)] border-r-0 rounded-l-xl px-2 py-4 hover:bg-[var(--bg-elevated)] transition-colors"
+            className="fixed top-1/2 -translate-y-1/2 right-0 z-[35] bg-[var(--bg-secondary)] border border-[var(--border)] border-r-0 rounded-l-xl px-2 py-4 hover:bg-[var(--bg-elevated)] transition-colors"
             title="Open chat">
             <div className="relative">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
