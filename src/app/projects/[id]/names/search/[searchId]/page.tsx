@@ -190,11 +190,11 @@ function GridCard({ card, index, onSave, onExplore, isSaved, tld }: {
 }
 
 // ===== DETAIL PANEL =====
-function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, onChoose, isSaved, chatOpen, advancedAvailability, extraVariants }: {
+function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, onChoose, isSaved, chatOpen, advancedAvailability, extraVariants, searchConfig }: {
   card: CardData; defaultTld: string; onClose: () => void;
   onUpdate: (updater: (c: CardData) => CardData) => void;
   onSave: () => void; onChoose: (domain: string) => void; isSaved: boolean; chatOpen: boolean;
-  advancedAvailability: boolean; extraVariants: boolean;
+  advancedAvailability: boolean; extraVariants: boolean; searchConfig: any;
 }) {
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -204,6 +204,38 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, onChoose, is
   const [addingTld, setAddingTld] = useState(false);
 
   useEffect(() => { setVariantTld(card.variantTld || defaultTld); setLoadingVariants(false); setVerifying(false); setTldInput(''); }, [card.id]);
+
+  const handleGenerateVariants = async () => {
+    setLoadingVariants(true);
+    try {
+      const existingVariants = card.variantDomains.map(v => v.domain);
+      const r = await fetch('/api/generate-variants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: card.name,
+          businessDescription: searchConfig?.businessDescription || '',
+          industry: searchConfig?.industry || '',
+          existingVariants,
+          tld: variantTld,
+        }),
+      });
+      if (r.ok) {
+        const { variants } = await r.json();
+        const newDomains: DCE[] = variants.map((v: string) => ({ domain: v, available: null, method: 'pending' as CM }));
+        onUpdate(c => ({ ...c, variantDomains: [...c.variantDomains, ...newDomains] }));
+        // Check availability for new variants
+        const results = await cachedDnsCheck(variants, variantTld);
+        onUpdate(c => ({
+          ...c,
+          variantDomains: c.variantDomains.map(v =>
+            results[v.domain] ? { ...v, available: results[v.domain].available, method: results[v.domain].method } : v
+          ),
+        }));
+      }
+    } catch (err) { console.error('Generate variants error:', err); }
+    finally { setLoadingVariants(false); }
+  };
 
   useEffect(() => {
     if (card.tldChecks.length > 0) return;
@@ -301,9 +333,11 @@ function DetailPanel({ card, defaultTld, onClose, onUpdate, onSave, onChoose, is
             {card.variantDomains.map(v => <DomainRow key={v.domain} domain={v.domain} tld={variantTld} available={v.available} method={v.method} />)}
           </div>
           {extraVariants ? (
-            <button onClick={() => {}} disabled={loadingVariants} className="w-full mt-2 py-2 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white/70 disabled:opacity-40 flex items-center justify-center gap-1.5">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-              Generate more variants
+            <button onClick={handleGenerateVariants} disabled={loadingVariants} className="w-full mt-2 py-2 rounded-lg text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] text-white/50 hover:text-white/70 disabled:opacity-40 flex items-center justify-center gap-1.5">
+              {loadingVariants ? <div className="w-3 h-3 border-[1.5px] rounded-full spinner" style={{ borderColor: 'rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.6)' }} /> : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+              )}
+              {loadingVariants ? 'Generating...' : 'Generate more variants'}
             </button>
           ) : <div className="mt-2"><UpgradePrompt feature="More variants" compact /></div>}
         </div>
@@ -730,7 +764,7 @@ export default function SearchResultsPage() {
         <ChatSidebar messages={chatMessages} onSend={handleChatSend} onAcceptChange={handleAcceptChange} onRejectChange={handleRejectChange}
           isLoading={chatLoading} isOpen={chatOpen} onToggle={() => setChatOpen(prev => !prev)} unreadCount={unreadCount} chatEnabled={features.aiChat} />
       </div>
-      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} onChoose={handleChooseName} isSaved={savedNames.has(activeCard.name)} chatOpen={chatOpen} advancedAvailability={features.advancedAvailability} extraVariants={features.extraVariants} />}
+      {activeCard && <DetailPanel card={activeCard} defaultTld={tld} onClose={() => setActiveCardId(null)} onUpdate={updateCard(activeCard.id)} onSave={() => handleSave(activeCard)} onChoose={handleChooseName} isSaved={savedNames.has(activeCard.name)} chatOpen={chatOpen} advancedAvailability={features.advancedAvailability} extraVariants={features.extraVariants} searchConfig={searchConfig} />}
     </div>
   );
 }
