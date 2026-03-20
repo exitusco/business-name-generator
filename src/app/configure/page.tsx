@@ -93,7 +93,7 @@ function ConfigureContent() {
         const projR = await fetch('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: desc ? desc.slice(0, 50) : 'Untitled Project' }),
+          body: JSON.stringify({ name: businessDescription ? businessDescription.slice(0, 50) : 'Untitled Project' }),
         });
         if (!projR.ok) throw new Error('Failed to create project');
         const { project } = await projR.json();
