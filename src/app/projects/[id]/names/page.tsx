@@ -28,6 +28,23 @@ async function cachedDnsCheck(domains: string[], tld: string): Promise<Record<st
   return results;
 }
 
+async function cachedWhoisCheck(domains: string[], tld: string): Promise<Record<string, { available: boolean; method: CM }>> {
+  const { cached, uncached: unc } = partitionCached(domains, tld);
+  const results: Record<string, { available: boolean; method: CM }> = {};
+  const toFetch: string[] = [...unc];
+  for (const [d, e] of Object.entries(cached)) {
+    if (e.method === 'whoisxml') results[d] = { available: e.available, method: 'whoisxml' };
+    else toFetch.push(d);
+  }
+  if (toFetch.length > 0) {
+    try {
+      const r = await fetch('/api/check-domain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domains: toFetch, tld }) });
+      if (r.ok) { const { results: xr } = await r.json(); for (const [d, av] of Object.entries(xr)) { const f = d.includes('.') ? d : `${d}.${tld}`; setCache(f, av as boolean, 'whoisxml'); results[d] = { available: av as boolean, method: 'whoisxml' }; } }
+    } catch {}
+  }
+  return results;
+}
+
 function statusColor(available: boolean | null, method: CM) {
   if (available === null) return SC.loading;
   if (!available) return SC.taken;
@@ -76,6 +93,8 @@ function ExpandedSavedCard({ result, searchConfig, onChoose, onClose, features }
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
 
   // Load TLD checks on mount
   useEffect(() => {
@@ -137,11 +156,42 @@ function ExpandedSavedCard({ result, searchConfig, onChoose, onClose, features }
     } catch {} finally { setLoadingVariants(false); }
   };
 
+  const handleVerifyAll = async () => {
+    setVerifying(true);
+    try {
+      // Verify variant domains that are dns-likely-free
+      const vd = variantDomains.filter(v => v.available === true && v.method === 'dns').map(v => v.domain);
+      const td = tldChecks.filter(t => t.available === true && t.method === 'dns').map(t => t.domain);
+      const ed = (exactDomain.available === true && exactDomain.method === 'dns') ? [exactDomain.domain] : [];
+
+      if (vd.length > 0) {
+        const res = await cachedWhoisCheck(vd, variantTld);
+        setVariantDomains(prev => prev.map(v => res[v.domain] ? { ...v, available: res[v.domain].available, method: 'whoisxml' as CM } : v));
+      }
+      if (td.length > 0) {
+        const res = await cachedWhoisCheck(td, 'noop');
+        setTldChecks(prev => prev.map(t => res[t.domain] ? { ...t, available: res[t.domain].available, method: 'whoisxml' as CM } : t));
+      }
+      if (ed.length > 0) {
+        const res = await cachedWhoisCheck(ed, variantTld);
+        if (res[exactDomain.domain]) {
+          setExactDomain(prev => ({ ...prev, available: res[prev.domain].available, method: 'whoisxml' as CM }));
+        }
+      }
+      setVerified(true);
+    } catch {} finally { setVerifying(false); }
+  };
+
   const handleChoose = async () => {
     setChoosing(true);
     await onChoose(result.id, selectedDomain);
     setChoosing(false);
   };
+
+  // Availability stats
+  const allDomains = [exactDomain, ...variantDomains, ...tldChecks];
+  const avCount = allDomains.filter(d => d.available === true).length;
+  const hasUnverified = allDomains.some(d => d.available === true && d.method === 'dns');
 
   // All available domains for the picker
   const availableDomains = [
@@ -170,6 +220,23 @@ function ExpandedSavedCard({ result, searchConfig, onChoose, onClose, features }
 
       {/* Domain sections */}
       <div className="p-4">
+        {/* Availability summary + verify */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <span className="text-xs" style={{ color: avCount > 0 ? (hasUnverified ? SC.likelyFree.text : SC.confirmed.text) : SC.taken.text }}>
+            {avCount} domain{avCount !== 1 ? 's' : ''} {hasUnverified ? 'look available' : 'available'}
+          </span>
+          {hasUnverified && !verified && (
+            features.advancedAvailability ? (
+              <button onClick={handleVerifyAll} disabled={verifying}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 disabled:opacity-40"
+                style={{ background: SC.confirmed.bg, color: SC.confirmed.text, border: `1px solid ${SC.confirmed.border}` }}>
+                {verifying ? <div className="w-3 h-3 border-[1.5px] rounded-full spinner" style={{ borderColor: SC.confirmed.text + '40', borderTopColor: SC.confirmed.text }} /> : null}
+                {verifying ? 'Verifying...' : 'Verify all'}
+              </button>
+            ) : <UpgradePrompt feature="Verify domains" compact />
+          )}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* TLD Explorer */}
           <div>

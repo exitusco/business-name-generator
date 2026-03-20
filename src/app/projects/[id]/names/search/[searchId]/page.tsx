@@ -406,6 +406,7 @@ export default function SearchResultsPage() {
   const batchNumberRef = useRef(1);
   const usedGrad = useRef<Set<number>>(new Set());
   const cardsLenRef = useRef(0);
+  const cardsRef = useRef<CardData[]>([]);
   const savedNamesRef = useRef<Set<string>>(new Set());
 
   // Model
@@ -427,7 +428,7 @@ export default function SearchResultsPage() {
 
   useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setUnreadCount(0); }, [chatOpen]);
   useEffect(() => { chatMessagesRef.current = chatMessages; }, [chatMessages]);
-  useEffect(() => { cardsLenRef.current = cards.length; }, [cards.length]);
+  useEffect(() => { cardsLenRef.current = cards.length; cardsRef.current = cards; }, [cards]);
   useEffect(() => { savedNamesRef.current = savedNames; }, [savedNames]);
 
   // Load search data from database
@@ -640,14 +641,24 @@ export default function SearchResultsPage() {
     } else {
       setSavedNames(prev => { const a = Array.from(prev); a.push(card.name); return new Set(a); });
     }
-    // Update in DB
-    if (card.dbId) {
-      fetch(`/api/searches/${searchId}/results`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resultId: card.dbId, action: 'toggleSave', isSaved: !isUnsaving }),
-      }).catch(() => {});
-    }
-    // Chat event for saves (pro only)
+
+    // Persist to DB — retry if dbId not yet available
+    const persistSave = (cardId: string, isSaved: boolean, attempts: number = 0) => {
+      const current = cardsRef.current.find(c => c.id === cardId);
+      if (current?.dbId) {
+        fetch(`/api/searches/${searchId}/results`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resultId: current.dbId, action: 'toggleSave', isSaved }),
+        }).catch(() => {});
+      } else if (attempts < 10) {
+        setTimeout(() => persistSave(cardId, isSaved, attempts + 1), 500);
+      } else {
+        console.warn('Save failed: dbId never assigned for', card.name);
+      }
+    };
+    persistSave(card.id, !isUnsaving);
+
+    // Chat event for saves
     if (!isUnsaving) {
       const eventMsg: ChatMsg = { id: `event-${Date.now()}`, role: 'system-event', content: `Saved "${card.name}"`, timestamp: Date.now() };
       setChatMessages(prev => [...prev, eventMsg]);

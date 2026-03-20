@@ -192,19 +192,30 @@ export async function saveSearchResults(searchId: string, results: Array<{
   position?: number;
 }>) {
   const db = getSupabase();
-  const rows = results.map(r => ({
-    search_id: searchId,
-    name: r.name,
-    category: r.category || null,
-    rationale: r.rationale || null,
-    gradient: r.gradient || null,
-    font_family: r.font_family || null,
-    text_color: r.text_color || null,
-    exact_domain: r.exact_domain || null,
-    variants: r.variants || [],
-    batch_number: r.batch_number || 1,
-    position: r.position || 0,
-  }));
+
+  // Check for existing names in this search to avoid duplicates
+  const { data: existing } = await db.from('search_results')
+    .select('name')
+    .eq('search_id', searchId);
+  const existingNames = new Set((existing || []).map((r: any) => r.name.toLowerCase()));
+
+  const rows = results
+    .filter(r => !existingNames.has(r.name.toLowerCase()))
+    .map(r => ({
+      search_id: searchId,
+      name: r.name,
+      category: r.category || null,
+      rationale: r.rationale || null,
+      gradient: r.gradient || null,
+      font_family: r.font_family || null,
+      text_color: r.text_color || null,
+      exact_domain: r.exact_domain || null,
+      variants: r.variants || [],
+      batch_number: r.batch_number || 1,
+      position: r.position || 0,
+    }));
+
+  if (rows.length === 0) return [];
 
   const { data, error } = await db.from('search_results').insert(rows).select();
   if (error) throw new Error(`Failed to save results: ${error.message}`);
@@ -298,7 +309,17 @@ export async function getSavedResults(projectId: string) {
     .eq('is_saved', true)
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Failed to get saved results: ${error.message}`);
-  return data || [];
+  
+  // Deduplicate by name — prefer chosen, then most recent
+  const seen = new Map<string, any>();
+  for (const row of data || []) {
+    const key = row.name.toLowerCase();
+    const existing = seen.get(key);
+    if (!existing || (row.is_chosen && !existing.is_chosen)) {
+      seen.set(key, row);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 export async function updateResultDomainChecks(resultId: string, domainChecks: Record<string, any>) {
