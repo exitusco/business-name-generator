@@ -317,15 +317,22 @@ export default function BusinessNamesPage() {
 
   const load = async () => {
     try {
-      const [projR, searchR] = await Promise.all([
+      const [projR, searchR, savedR] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/searches`),
+        fetch(`/api/projects/${projectId}/saved-results`),
       ]);
       if (projR.ok) { const { project: p } = await projR.json(); setProject(p); }
       if (searchR.ok) { const { searches: s } = await searchR.json(); setSearches(s || []); }
-      const savedR = await fetch(`/api/projects/${projectId}/saved-results`);
-      if (savedR.ok) { const { results } = await savedR.json(); setSavedResults(results || []); }
-    } catch {} finally { setLoading(false); }
+      if (savedR.ok) {
+        const { results } = await savedR.json();
+        setSavedResults(results || []);
+      } else {
+        console.error('Saved results fetch failed:', savedR.status, await savedR.text().catch(() => ''));
+      }
+    } catch (err) {
+      console.error('Load error:', err);
+    } finally { setLoading(false); }
   };
 
   const handleNewSearch = () => {

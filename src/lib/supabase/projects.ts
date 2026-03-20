@@ -143,6 +143,7 @@ export async function listSearches(projectId: string) {
     .eq('project_id', projectId)
     .order('updated_at', { ascending: false });
   if (error) throw new Error(`Failed to list searches: ${error.message}`);
+  console.log('listSearches: found', (data || []).length, 'searches for project', projectId);
   return data || [];
 }
 
@@ -296,19 +297,31 @@ export async function unchooseName(projectId: string) {
 export async function getSavedResults(projectId: string) {
   const db = getSupabase();
   // Get all searches for this project first, then get saved results
-  const { data: searches } = await db.from('searches')
+  const { data: searches, error: searchErr } = await db.from('searches')
     .select('id')
     .eq('project_id', projectId);
   
-  if (!searches || searches.length === 0) return [];
+  if (searchErr) {
+    console.error('getSavedResults: search query error:', searchErr);
+    throw new Error(`Failed to get searches: ${searchErr.message}`);
+  }
+  
+  if (!searches || searches.length === 0) {
+    console.log('getSavedResults: no searches found for project', projectId);
+    return [];
+  }
   
   const searchIds = searches.map((s: any) => s.id);
+  console.log('getSavedResults: searching', searchIds.length, 'searches for project', projectId);
+  
   const { data, error } = await db.from('search_results')
     .select('*')
     .in('search_id', searchIds)
     .eq('is_saved', true)
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Failed to get saved results: ${error.message}`);
+  
+  console.log('getSavedResults: found', (data || []).length, 'saved results before dedup');
   
   // Deduplicate by name — prefer chosen, then most recent
   const seen = new Map<string, any>();
@@ -319,6 +332,8 @@ export async function getSavedResults(projectId: string) {
       seen.set(key, row);
     }
   }
+  
+  console.log('getSavedResults: returning', seen.size, 'unique saved results');
   return Array.from(seen.values());
 }
 
