@@ -658,21 +658,20 @@ export default function SearchResultsPage() {
   }, [generateBatch]);
 
   const handleChooseName = useCallback(async (domain: string) => {
-    if (!activeCard?.dbId) return;
+    const card = cards.find(c => c.id === activeCardId);
+    if (!card?.dbId) return;
     try {
       const r = await fetch(`/api/searches/${searchId}/choose`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resultId: activeCard.dbId, domain }),
+        body: JSON.stringify({ resultId: card.dbId, domain }),
       });
       if (r.ok) {
-        const { projectName } = await r.json();
-        // Show success and navigate to project
         setActiveCardId(null);
         router.push(`/projects/${projectId}/names`);
       }
     } catch (err) { console.error('Choose name error:', err); }
-  }, [activeCard, searchId, projectId, router]);
+  }, [activeCardId, cards, searchId, projectId, router]);
 
   const activeCard = activeCardId ? cards.find(c => c.id === activeCardId) : null;
   const updateCard = useCallback((id: string) => (fn: (c: CardData) => CardData) => { setCards(prev => prev.map(c => c.id === id ? fn(c) : c)); }, []);
