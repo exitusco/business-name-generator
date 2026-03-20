@@ -14,6 +14,260 @@ export type Database = {
   }
   public: {
     Tables: {
+      project_components: {
+        Row: {
+          component_type: string
+          created_at: string
+          id: string
+          project_id: string
+          result_data: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          component_type: string
+          created_at?: string
+          id?: string
+          project_id: string
+          result_data?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          component_type?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          result_data?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_components_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          anonymous_id: string | null
+          chosen_domain: string | null
+          chosen_name: string | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          anonymous_id?: string | null
+          chosen_domain?: string | null
+          chosen_name?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          anonymous_id?: string | null
+          chosen_domain?: string | null
+          chosen_name?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      search_chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          search_id: string
+          suggested_changes: Json | null
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          role: string
+          search_id: string
+          suggested_changes?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          search_id?: string
+          suggested_changes?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_chat_messages_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_dividers: {
+        Row: {
+          created_at: string
+          id: string
+          position: number
+          search_id: string
+          text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position: number
+          search_id: string
+          text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: number
+          search_id?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_dividers_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_results: {
+        Row: {
+          batch_number: number | null
+          category: string | null
+          created_at: string
+          domain_checks: Json | null
+          exact_domain: string | null
+          font_family: string | null
+          gradient: string | null
+          id: string
+          is_chosen: boolean
+          is_saved: boolean
+          name: string
+          position: number | null
+          rationale: string | null
+          search_id: string
+          text_color: string | null
+          variants: Json | null
+        }
+        Insert: {
+          batch_number?: number | null
+          category?: string | null
+          created_at?: string
+          domain_checks?: Json | null
+          exact_domain?: string | null
+          font_family?: string | null
+          gradient?: string | null
+          id?: string
+          is_chosen?: boolean
+          is_saved?: boolean
+          name: string
+          position?: number | null
+          rationale?: string | null
+          search_id: string
+          text_color?: string | null
+          variants?: Json | null
+        }
+        Update: {
+          batch_number?: number | null
+          category?: string | null
+          created_at?: string
+          domain_checks?: Json | null
+          exact_domain?: string | null
+          font_family?: string | null
+          gradient?: string | null
+          id?: string
+          is_chosen?: boolean
+          is_saved?: boolean
+          name?: string
+          position?: number | null
+          rationale?: string | null
+          search_id?: string
+          text_color?: string | null
+          variants?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_results_search_id_fkey"
+            columns: ["search_id"]
+            isOneToOne: false
+            referencedRelation: "searches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      searches: {
+        Row: {
+          anonymous_id: string | null
+          component_id: string | null
+          config: Json
+          created_at: string
+          id: string
+          project_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          anonymous_id?: string | null
+          component_id?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          project_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          anonymous_id?: string | null
+          component_id?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "searches_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "project_components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "searches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usage_events: {
         Row: {
           anonymous_id: string | null

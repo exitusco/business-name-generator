@@ -12,9 +12,7 @@ export default function Home() {
   const handleSubmit = () => {
     if (!description.trim()) return;
     setIsSubmitting(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('nc_description', description.trim());
-    }
+    localStorage.setItem('nc_description', description.trim());
     router.push('/configure');
   };
 
