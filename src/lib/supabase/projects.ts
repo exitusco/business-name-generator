@@ -257,6 +257,31 @@ export async function chooseResult(resultId: string, searchId: string) {
   return data;
 }
 
+export async function unchooseName(projectId: string) {
+  const db = getSupabase();
+
+  // Clear chosen from project
+  await db.from('projects')
+    .update({ chosen_name: null, chosen_domain: null })
+    .eq('id', projectId);
+
+  // Mark component as in_progress
+  await db.from('project_components')
+    .update({ status: 'in_progress', result_data: {} })
+    .eq('project_id', projectId)
+    .eq('component_type', 'business_name');
+
+  // Unchoose all results across all searches in this project
+  const { data: searches } = await db.from('searches').select('id').eq('project_id', projectId);
+  if (searches) {
+    const ids = searches.map((s: any) => s.id);
+    await db.from('search_results')
+      .update({ is_chosen: false })
+      .in('search_id', ids)
+      .eq('is_chosen', true);
+  }
+}
+
 export async function getSavedResults(projectId: string) {
   const db = getSupabase();
   // Get all searches for this project first, then get saved results

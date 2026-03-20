@@ -438,11 +438,13 @@ export default function SearchResultsPage() {
   const loadSearchData = async () => {
     try {
       // Load search config
+      let loadedTld = 'com';
       const searchR = await fetch(`/api/searches/${searchId}`);
       if (searchR.ok) {
         const { search } = await searchR.json();
         setSearchConfig(search.config);
-        setTld(search.config?.tld || 'com');
+        loadedTld = search.config?.tld || 'com';
+        setTld(loadedTld);
       }
 
       // Load existing results
@@ -465,7 +467,7 @@ export default function SearchResultsPage() {
               verified: false,
               verifying: false,
               loadingVariants: false,
-              variantTld: r.config?.tld || 'com',
+              variantTld: loadedTld,
               gradient: r.gradient || genStyle(usedGrad.current).gradient,
               fontFamily: r.font_family || CARD_FONTS[Math.floor(Math.random() * CARD_FONTS.length)],
               textColor: r.text_color || '#ffffff',
@@ -477,6 +479,7 @@ export default function SearchResultsPage() {
           setCards(loaded);
           setSavedNames(new Set(results.filter((r: any) => r.is_saved).map((r: any) => r.name)));
           batchNumberRef.current = Math.max(...results.map((r: any) => r.batch_number || 1)) + 1;
+          hasGeneratedRef.current = true; // existing results loaded, enable infinite scroll
 
           // Check domains for loaded cards
           for (const c of loaded) {
@@ -573,23 +576,27 @@ export default function SearchResultsPage() {
     } catch (err: any) { setError(err.message || 'Failed'); } finally { setIsGenerating(false); loadingRef.current = false; }
   }, [checkDomainsForCard, searchConfig, searchId]);
 
-  // Initial generation
+  const hasGeneratedRef = useRef(false);
+
+  // Initial generation - only if no results loaded from DB
   useEffect(() => {
-    if (initialLoaded && searchConfig && cards.length === 0) {
+    if (initialLoaded && searchConfig && cards.length === 0 && !hasGeneratedRef.current) {
+      hasGeneratedRef.current = true;
       setTimeout(() => generateBatch(), 100);
     }
-  }, [initialLoaded, searchConfig]);
+  }, [initialLoaded, searchConfig, cards.length]);
 
-  // Infinite scroll
+  // Infinite scroll - only after initial generation has happened
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
+    if (!hasGeneratedRef.current) return; // Don't observe until first batch is done
     observerRef.current = new IntersectionObserver(
       (entries) => { if (entries.some(e => e.isIntersecting) && !loadingRef.current && initialLoaded) generateBatch(); },
       { rootMargin: '600px', threshold: 0 }
     );
     if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
     return () => observerRef.current?.disconnect();
-  }, [generateBatch, initialLoaded]);
+  }, [generateBatch, initialLoaded, cards.length]);
 
   // Chat handlers
   const callChatApi = useCallback(async (messages: ChatMsg[], extraSavedNames?: string[]) => {
@@ -688,7 +695,8 @@ export default function SearchResultsPage() {
   const handleRefresh = useCallback(() => {
     setCards([]); setDividers({}); setChatMessages([]); setActiveCardId(null); setError(null);
     existingNamesRef.current = []; batchNumberRef.current = 1; loadingRef.current = false; usedGrad.current.clear();
-    setTimeout(() => generateBatch(), 100);
+    hasGeneratedRef.current = false;
+    setTimeout(() => { hasGeneratedRef.current = true; generateBatch(); }, 100);
   }, [generateBatch]);
 
   const handleChooseName = useCallback(async (domain: string) => {
